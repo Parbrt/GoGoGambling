@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { getPlayerByUserId, supabase } from "../lib/supabase";
 import type { PlayerType } from "../types";
 
+//Adding comment
+
 interface DailyRewardProps {
   userId: string;
   onRewardClaimed?: () => void;
@@ -75,7 +77,7 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     setRewardClaimed(true);
     setShowModal(false);
     setCanClaim(false);
-    
+
     // Notifier le parent pour rafraîchir les données
     if (onRewardClaimed) {
       onRewardClaimed();
@@ -114,8 +116,8 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
               </h2>
 
               <p className="text-gray-600 mb-6">
-                {player?.last_login 
-                  ? "Vous êtes de retour ! Voici votre récompense pour aujourd'hui." 
+                {player?.last_login
+                  ? "Vous êtes de retour ! Voici votre récompense pour aujourd'hui."
                   : "Bienvenue ! Profitez de votre première récompense."}
               </p>
 
