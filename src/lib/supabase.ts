@@ -71,9 +71,25 @@ export async function getPlayerByUserId(userId: string): Promise<PlayerType | nu
 
 export async function updateLastLogin(userId: string) {
   const { error } = await supabase
-    .from("player")
+    .from('player')
     .update({ last_login: new Date().toISOString() })
-    .eq("user_id", userId)
+    .eq('user_id', userId)
 
   if (error) throw error;
+}
+
+export async function updatePlayerPoints(userId: string, newPoints: number) {
+  const { data, error } = await supabase
+    .from('player')
+    .update({ nb_point: newPoints })
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Erreur lors de la mise à jour des points:', error);
+    throw error;
+  }
+
+  return data;
 }

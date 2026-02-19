@@ -1,12 +1,17 @@
 import "./index.css";
 import { useState, useEffect } from "react";
-import PlayersList from "./components/PlayersList";
-import { DailyReward } from "./components/DailyReward";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { Header } from "./components/Header";
+import { Home } from "./pages/Home";
+import { Games } from "./pages/Games";
+import { Leaderboard } from "./pages/Leaderboard";
+import { ChickenFightPage } from "./pages/ChickenFightPage";
 import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin } from './lib/supabase'
 import type { User } from '@supabase/supabase-js';
 import type { PlayerType } from './types';
 
-export default function App() {
+// Auth wrapper component
+function AppContent() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -122,8 +127,7 @@ export default function App() {
     setLoading(false);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
+  const handleLogout = () => {
     setUser(null);
     setPlayer(null);
   };
@@ -131,119 +135,142 @@ export default function App() {
   // Show auth error
   if (authError) {
     return (
-      <div>
-        <h1>Authentication</h1>
-        <p>✗ Erreur : {authError}</p>
-        <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => setAuthError(null)}>
-          Retour
-        </button>
-      </div>
-    );
-  }
-
-  // If user is logged in, show welcome screen with player info
-  if (user && player) {
-    return (
-      <div>
-        <h1>Bienvenue {player.player_name} !</h1>
-        <p>Connecté en tant que : {user.email}</p>
-        <div style={{ margin: '20px 0', padding: '15px', border: '1px solid #ccc', borderRadius: '8px' }}>
-          <h3>Vos informations</h3>
-          <p><strong>Nom:</strong> {player.player_name}</p>
-          <p><strong>Points:</strong> {player.nb_point}</p>
-          <p><strong>Dettes:</strong> {player.nb_debt}</p>
-          <p><strong>Actions A:</strong> {player.nb_share_A} (valeur moyenne: {player.avg_share_A_value})</p>
-          <p><strong>Actions B:</strong> {player.nb_share_B} (valeur moyenne: {player.avg_share_B_value})</p>
-          <p><strong>Dernière connexion</strong> {player.last_login ? new Date(player.last_login).toLocaleString('fr-FR') : 'Jamais'}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
+          <h1 className="text-2xl font-bold mb-4">Authentication</h1>
+          <p className="text-red-500 mb-4">✗ Erreur : {authError}</p>
+          <button 
+            className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" 
+            onClick={() => setAuthError(null)}
+          >
+            Retour
+          </button>
         </div>
-        <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" onClick={handleLogout}>
-          Se déconnecter
-        </button>
-        <h2>Liste des joueurs</h2>
-        <PlayersList />
-        
-        {/* Daily Reward Component */}
-        <DailyReward 
-          userId={user.id} 
-          onRewardClaimed={async () => {
-            // Rafraîchir les données du joueur après réclamation
-            const updatedPlayer = await getPlayerByUserId(user.id);
-            setPlayer(updatedPlayer);
-          }}
-        />
       </div>
     );
   }
 
-  // If user is logged in but no player found
-  if (user && !player) {
+  // Show login/signup form if not authenticated
+  if (!user || !player) {
     return (
-      <div>
-        <h1>Bienvenue !</h1>
-        <p>Connecté en tant que : {user.email}</p>
-        <p>Chargement de votre profil...</p>
-        <button onClick={handleLogout}>
-          Se déconnecter
-        </button>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
+          <h1 className="text-3xl font-bold text-center mb-2">GoGoGambling</h1>
+          <p className="text-center text-gray-600 mb-6">
+            {isSignUp ? "Créer un compte" : "Connexion"}
+          </p>
+          
+          <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+            {isSignUp && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom d'utilisateur
+                </label>
+                <input
+                  type="text"
+                  placeholder="Votre pseudo"
+                  value={username}
+                  required={isSignUp}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="votre@email.com"
+                value={email}
+                required
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mot de passe
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                required
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors"
+            >
+              {loading ? "Chargement..." : (isSignUp ? "Créer un compte" : "Se connecter")}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setAuthError(null);
+              }}
+              className="text-blue-500 hover:text-blue-700 text-sm"
+            >
+              {isSignUp 
+                ? "Déjà un compte ? Se connecter" 
+                : "Pas de compte ? Créer un compte"}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Show login/signup form
+  // Authenticated app with routes
   return (
-    <div>
-      <h1>Supabase + React</h1>
-      <p>{isSignUp ? "Créer un compte" : "Connexion"}</p>
-      <form>
-        {isSignUp && (
-          <input
-            type="text"
-            placeholder="Nom d'utilisateur"
-            value={username}
-            required={true}
-            onChange={(e) => setUsername(e.target.value)}
+    <div className="min-h-screen bg-gray-50">
+      <Header playerName={player.player_name} onLogout={handleLogout} />
+      
+      <main>
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              <Home 
+                user={user} 
+                player={player} 
+                onPlayerUpdate={setPlayer}
+              />
+            } 
           />
-        )}
-        <input
-          type="email"
-          placeholder="Votre email"
-          value={email}
-          required={true}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Votre mot de passe"
-          value={password}
-          required={true}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {isSignUp ? (
-          <>
-            <button onClick={handleSignUp} disabled={loading}>
-              {loading ? "Chargement..." : "Créer un compte"}
-            </button>
-            <p>
-              Déjà un compte ?{" "}
-              <button type="button" onClick={() => setIsSignUp(false)}>
-                Se connecter
-              </button>
-            </p>
-          </>
-        ) : (
-          <>
-            <button onClick={handleLogin} disabled={loading}>
-              {loading ? "Chargement..." : "Se connecter"}
-            </button>
-            <p>
-              Pas de compte ?{" "}
-              <button type="button" onClick={() => setIsSignUp(true)}>
-                Créer un compte
-              </button>
-            </p>
-          </>
-        )}
-      </form>
+          <Route path="/games" element={<Games />} />
+          <Route 
+            path="/games/chicken-fight" 
+            element={
+              <ChickenFightPage 
+                userId={user.id}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            } 
+          />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
     </div>
   );
 }
+
+function App() {
+  return <AppContent />;
+}
+
+export default App;
