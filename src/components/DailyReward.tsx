@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getPlayerByUserId, supabase } from "../lib/supabase";
 import type { PlayerType } from "../types";
 
-//Adding comment
+//Adding comment again 
 
 interface DailyRewardProps {
   userId: string;
