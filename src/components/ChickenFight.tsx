@@ -1,7 +1,17 @@
 import { useState, useCallback } from "react";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Loader2 } from "lucide-react";
+import {
   createChicken,
-  getScale,
   fight,
   generatePopulation,
   calculateBets,
@@ -10,8 +20,8 @@ import {
   type Chicken,
   type FightResult,
   type BetInfo,
-} from "../lib/chickenGame";
-import { updatePlayerPoints } from "../lib/supabase";
+} from "@/lib/chickenGame";
+import { updatePlayerPoints } from "@/lib/supabase";
 
 interface ChickenFightProps {
   userId: string;
@@ -61,7 +71,6 @@ export function ChickenFight({
 
     setPhase("fighting");
 
-    // Simulate fight delay for suspense
     setTimeout(async () => {
       const result = fight(chickenA, chickenB);
       setFightResult(result);
@@ -106,242 +115,231 @@ export function ChickenFight({
     setError(null);
   }, []);
 
-  const getStatColor = (value: number) => {
-    if (value > 66) return "text-green-600 font-bold";
-    if (value > 33) return "text-yellow-600 font-semibold";
-    return "text-red-500";
+  const getStatBadge = (value: number) => {
+    if (value > 66) return <Badge className="bg-green-500 hover:bg-green-600">HIGH</Badge>;
+    if (value > 33) return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">MID</Badge>;
+    return <Badge variant="destructive">LOW</Badge>;
   };
 
   return (
-    <div className="mt-8 p-6 bg-white rounded-xl shadow-lg">
-      <h2 className="text-2xl font-bold text-center mb-6">
-        🐔 Combat de Poulets
-      </h2>
+    <Card>
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">🐔 Combat de Poulets</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {error && (
+          <div className="p-4 bg-destructive/10 text-destructive rounded-lg">
+            {error}
+          </div>
+        )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-          {error}
+        <div className="text-center">
+          <p className="text-lg">
+            Vos points: <span className="font-bold text-primary text-xl">{currentPoints}</span>
+          </p>
         </div>
-      )}
 
-      <div className="mb-4 text-center">
-        <p className="text-lg">
-          Vos points: <span className="font-bold text-blue-600">{currentPoints}</span>
-        </p>
-      </div>
+        {/* Betting Phase */}
+        {phase === "betting" && (
+          <>
+            {/* Chicken Cards */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Chicken A */}
+              <Card 
+                className={`cursor-pointer transition-all ${
+                  selectedChicken === 1
+                    ? "border-primary ring-2 ring-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => handleChickenSelect(1)}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg text-center">🐔 Poulet A</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {CHICKEN_STATS.map((stat, index) => (
+                    <div
+                      key={stat}
+                      className="flex justify-between items-center"
+                    >
+                      <span className="text-sm text-muted-foreground">{stat}</span>
+                      {getStatBadge(chickenA[index])}
+                    </div>
+                  ))}
+                  {selectedChicken === 1 && (
+                    <div className="mt-2 text-center">
+                      <Badge variant="outline" className="border-primary text-primary">✓ Sélectionné</Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-      {/* Betting Phase */}
-      {phase === "betting" && (
-        <>
-          {/* Chicken Cards */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {/* Chicken A */}
-            <div
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                selectedChicken === 1
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-blue-300"
-              }`}
-              onClick={() => handleChickenSelect(1)}
-            >
-              <h3 className="text-lg font-bold text-center mb-3">🐔 Poulet A</h3>
-              <div className="space-y-2">
-                {CHICKEN_STATS.map((stat, index) => (
-                  <div
-                    key={stat}
-                    className="flex justify-between items-center"
-                  >
-                    <span className="text-sm text-gray-600">{stat}</span>
-                    <span className={getStatColor(chickenA[index])}>
-                      {getScale(chickenA[index])}
-                    </span>
+              {/* Chicken B */}
+              <Card 
+                className={`cursor-pointer transition-all ${
+                  selectedChicken === 2
+                    ? "border-primary ring-2 ring-primary bg-primary/5"
+                    : "hover:border-primary/50"
+                }`}
+                onClick={() => handleChickenSelect(2)}
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg text-center">🐔 Poulet B</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {CHICKEN_STATS.map((stat, index) => (
+                    <div
+                      key={stat}
+                      className="flex justify-between items-center"
+                    >
+                      <span className="text-sm text-muted-foreground">{stat}</span>
+                      {getStatBadge(chickenB[index])}
+                    </div>
+                  ))}
+                  {selectedChicken === 2 && (
+                    <div className="mt-2 text-center">
+                      <Badge variant="outline" className="border-primary text-primary">✓ Sélectionné</Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Betting Info */}
+            <Card className="bg-muted/50">
+              <CardContent className="pt-6">
+                <div className="flex justify-between items-center">
+                  <div className="text-center flex-1">
+                    <p className="text-2xl font-bold text-primary">
+                      {betInfo.betA}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Mise totale sur A</p>
                   </div>
-                ))}
-              </div>
-              {selectedChicken === 1 && (
-                <div className="mt-3 text-center text-blue-600 font-semibold">
-                  ✓ Sélectionné
-                </div>
-              )}
-            </div>
-
-            {/* Chicken B */}
-            <div
-              className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                selectedChicken === 2
-                  ? "border-red-500 bg-red-50"
-                  : "border-gray-200 hover:border-red-300"
-              }`}
-              onClick={() => handleChickenSelect(2)}
-            >
-              <h3 className="text-lg font-bold text-center mb-3">🐔 Poulet B</h3>
-              <div className="space-y-2">
-                {CHICKEN_STATS.map((stat, index) => (
-                  <div
-                    key={stat}
-                    className="flex justify-between items-center"
-                  >
-                    <span className="text-sm text-gray-600">{stat}</span>
-                    <span className={getStatColor(chickenB[index])}>
-                      {getScale(chickenB[index])}
-                    </span>
+                  <div className="text-center px-4">
+                    <p className="text-3xl font-bold">
+                      {betInfo.display}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Cote</p>
                   </div>
-                ))}
-              </div>
-              {selectedChicken === 2 && (
-                <div className="mt-3 text-center text-red-600 font-semibold">
-                  ✓ Sélectionné
+                  <div className="text-center flex-1">
+                    <p className="text-2xl font-bold text-primary">
+                      {betInfo.betB}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Mise totale sur B</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </CardContent>
+            </Card>
 
-          {/* Betting Info */}
-          <div className="bg-gray-100 p-4 rounded-lg mb-4">
-            <div className="flex justify-between items-center">
-              <div className="text-center flex-1">
-                <p className="text-2xl font-bold text-blue-600">
-                  {betInfo.betA}
+            {/* Bet Input */}
+            {selectedChicken && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Montant de votre mise:</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={currentPoints}
+                    value={betAmount}
+                    onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)}
+                    placeholder={`Max: ${currentPoints} points`}
+                  />
+                </div>
+                <div className="flex justify-between gap-2">
+                  <Button variant="outline" onClick={() => handleBetChange(10)} className="flex-1">
+                    +10
+                  </Button>
+                  <Button variant="outline" onClick={() => handleBetChange(50)} className="flex-1">
+                    +50
+                  </Button>
+                  <Button variant="outline" onClick={() => handleBetChange(100)} className="flex-1">
+                    +100
+                  </Button>
+                  <Button variant="secondary" onClick={() => handleBetChange(currentPoints)} className="flex-1">
+                    All-In
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Start Button */}
+            <Button
+              onClick={handleStartFight}
+              disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints}
+              className="w-full"
+              size="lg"
+            >
+              {selectedChicken && betAmount > 0
+                ? `Lancer le combat (${betAmount} points)`
+                : "Sélectionnez un poulet et une mise"}
+            </Button>
+          </>
+        )}
+
+        {/* Fighting Phase */}
+        {phase === "fighting" && (
+          <div className="text-center py-8 space-y-4">
+            <div className="text-6xl">🥊</div>
+            <p className="text-xl font-bold">Le combat est en cours...</p>
+            <div className="flex justify-center">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+            {fightResult && (
+              <div className="text-sm text-muted-foreground">
+                <p>Caractéristiques du combat:</p>
+                <p className="font-semibold">
+                  {fightResult.statNames.join(" • ")}
                 </p>
-                <p className="text-sm text-gray-600">Mise totale sur A</p>
               </div>
-              <div className="text-center px-4">
-                <p className="text-3xl font-bold text-purple-600">
-                  {betInfo.display}
-                </p>
-                <p className="text-sm text-gray-600">Cote</p>
-              </div>
-              <div className="text-center flex-1">
-                <p className="text-2xl font-bold text-red-600">
-                  {betInfo.betB}
-                </p>
-                <p className="text-sm text-gray-600">Mise totale sur B</p>
-              </div>
-            </div>
+            )}
           </div>
+        )}
 
-          {/* Bet Input */}
-          {selectedChicken && (
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Montant de votre mise:
-              </label>
-              <input
-                type="number"
-                min="0"
-                max={currentPoints}
-                value={betAmount}
-                onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={`Max: ${currentPoints} points`}
-              />
-              <div className="flex justify-between mt-2">
-                <button
-                  onClick={() => handleBetChange(10)}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-                >
-                  +10
-                </button>
-                <button
-                  onClick={() => handleBetChange(50)}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-                >
-                  +50
-                </button>
-                <button
-                  onClick={() => handleBetChange(100)}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-                >
-                  +100
-                </button>
-                <button
-                  onClick={() => handleBetChange(currentPoints)}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm font-semibold"
-                >
-                  All-In
-                </button>
-              </div>
+        {/* Result Phase */}
+        {phase === "result" && (
+          <div className="text-center py-8 space-y-6">
+            <div className="text-6xl">
+              {selectedChicken === fightResult?.winner ? "🏆" : "😢"}
             </div>
-          )}
-
-          {/* Start Button */}
-          <button
-            onClick={handleStartFight}
-            disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints}
-            className="w-full bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-colors"
-          >
-            {selectedChicken && betAmount > 0
-              ? `Lancer le combat (${betAmount} points)`
-              : "Sélectionnez un poulet et une mise"}
-          </button>
-        </>
-      )}
-
-      {/* Fighting Phase */}
-      {phase === "fighting" && (
-        <div className="text-center py-8">
-          <div className="text-6xl mb-4">🥊</div>
-          <p className="text-xl font-bold">Le combat est en cours...</p>
-          <div className="mt-4 flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-          {fightResult && (
-            <div className="mt-6 text-sm text-gray-600">
-              <p>Caractéristiques du combat:</p>
-              <p className="font-semibold">
-                {fightResult.statNames.join(" • ")}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Result Phase */}
-      {phase === "result" && (
-        <div className="text-center py-8">
-          <div className="text-6xl mb-4">
-            {selectedChicken === fightResult?.winner ? "🏆" : "😢"}
-          </div>
-          <p
-            className={`text-2xl font-bold mb-4 ${
+            <p className={`text-2xl font-bold ${
               selectedChicken === fightResult?.winner
                 ? "text-green-600"
-                : "text-red-500"
-            }`}
-          >
-            {resultMessage}
-          </p>
+                : "text-destructive"
+            }`}>
+              {resultMessage}
+            </p>
 
-          {/* Fight Details */}
-          {fightResult && (
-            <div className="bg-gray-100 p-4 rounded-lg mb-6 text-left">
-              <h4 className="font-bold mb-2">Détails du combat:</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="font-semibold text-blue-600">Poulet A</p>
-                  <p>Score: {fightResult.scores.a.toFixed(1)}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-red-600">Poulet B</p>
-                  <p>Score: {fightResult.scores.b.toFixed(1)}</p>
-                </div>
-              </div>
-              <div className="mt-3 pt-3 border-t">
-                <p className="text-sm text-gray-600">
-                  Gagnant: Poulet {fightResult.winner}
-                </p>
-              </div>
-            </div>
-          )}
+            {/* Fight Details */}
+            {fightResult && (
+              <Card className="bg-muted/50 text-left">
+                <CardHeader>
+                  <CardTitle className="text-base">Détails du combat</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="font-semibold text-primary">Poulet A</p>
+                      <p>Score: {fightResult.scores.a.toFixed(1)}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-primary">Poulet B</p>
+                      <p>Score: {fightResult.scores.b.toFixed(1)}</p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <p className="text-sm text-muted-foreground">
+                    Gagnant: Poulet {fightResult.winner}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
-          <button
-            onClick={handleNextRound}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
-          >
-            Prochain combat
-          </button>
-        </div>
-      )}
-    </div>
+            <Button onClick={handleNextRound} size="lg">
+              Prochain combat
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

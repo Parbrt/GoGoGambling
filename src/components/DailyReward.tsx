@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
-import { getPlayerByUserId, supabase } from "../lib/supabase";
-import type { PlayerType } from "../types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Gift } from "lucide-react";
+import { getPlayerByUserId, supabase } from "@/lib/supabase";
+import type { PlayerType } from "@/types";
 
 interface DailyRewardProps {
   userId: string;
@@ -18,7 +29,6 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     loadPlayer();
   }, [userId]);
 
-  // Afficher automatiquement la popup si on peut claim
   useEffect(() => {
     if (canClaim && !rewardClaimed) {
       setShowModal(true);
@@ -32,7 +42,6 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     if (playerData?.last_login) {
       checkIfCanClaim(playerData.last_login);
     } else {
-      // Nouvel utilisateur - peut claim immédiatement
       setCanClaim(true);
     }
   };
@@ -76,7 +85,6 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     setShowModal(false);
     setCanClaim(false);
 
-    // Notifier le parent pour rafraîchir les données
     if (onRewardClaimed) {
       onRewardClaimed();
     }
@@ -86,12 +94,11 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     setShowModal(false);
   };
 
-  // Si on ne peut pas claim ou que la récompense a déjà été prise, ne rien afficher
   if (!canClaim || rewardClaimed) {
     return (
-      <div className="text-sm text-gray-500 mt-4">
+      <div className="text-sm text-muted-foreground mt-4">
         {!canClaim && timeRemaining && (
-          <p>Prochaine récompense dans : {timeRemaining}</p>
+          <Badge variant="outline">Prochaine récompense dans : {timeRemaining}</Badge>
         )}
       </div>
     );
@@ -99,60 +106,46 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
 
   return (
     <>
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-[0_20px_60px_rgba(0,0,0,0.3)] transform transition-all">
-            <div className="text-center">
-              {/* Icône cadeau */}
-              <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
-                <span className="text-4xl">🎁</span>
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                Récompense Quotidienne !
-              </h2>
-
-              <p className="text-gray-600 mb-6">
-                {player?.last_login
-                  ? "Vous êtes de retour ! Voici votre récompense pour aujourd'hui."
-                  : "Bienvenue ! Profitez de votre première récompense."}
-              </p>
-
-              <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4 mb-6">
-                <p className="text-yellow-800 font-semibold text-lg">
-                  +50 points
-                </p>
-              </div>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={claimReward}
-                  className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-                >
-                  Réclamer
-                </button>
-                <button
-                  onClick={closeModal}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-                >
-                  Plus tard
-                </button>
-              </div>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+              <Gift className="w-8 h-8 text-yellow-600" />
             </div>
-          </div>
-        </div>
-      )}
+            <DialogTitle className="text-2xl">Récompense Quotidienne !</DialogTitle>
+            <DialogDescription>
+              {player?.last_login
+                ? "Vous êtes de retour ! Voici votre récompense pour aujourd'hui."
+                : "Bienvenue ! Profitez de votre première récompense."}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Card className="bg-yellow-50 border-yellow-200">
+            <CardContent className="pt-6 text-center">
+              <p className="text-yellow-800 font-bold text-xl">+50 points</p>
+            </CardContent>
+          </Card>
 
-      {/* Bouton pour ouvrir manuellement la modal (optionnel) */}
+          <div className="flex gap-3">
+            <Button onClick={claimReward} className="flex-1">
+              Réclamer
+            </Button>
+            <Button variant="outline" onClick={closeModal} className="flex-1">
+              Plus tard
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {!showModal && canClaim && !rewardClaimed && (
-        <button
+        <Button
           onClick={() => setShowModal(true)}
-          className="fixed bottom-4 right-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 hover:scale-105 flex items-center gap-2"
+          className="fixed bottom-4 right-4 gap-2"
+          size="lg"
         >
-          <span>🎁</span>
-          <span>Récompense disponible !</span>
-        </button>
+          <Gift className="w-5 h-5" />
+          Récompense disponible !
+        </Button>
       )}
     </>
   );

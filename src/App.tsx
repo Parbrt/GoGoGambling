@@ -1,16 +1,20 @@
 import "./index.css";
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
-import { Header } from "./components/Header";
-import { Home } from "./pages/Home";
-import { Games } from "./pages/Games";
-import { Leaderboard } from "./pages/Leaderboard";
-import { ChickenFightPage } from "./pages/ChickenFightPage";
-import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin } from './lib/supabase'
+import { Header } from "@/components/Header";
+import { Home } from "@/pages/Home";
+import { Games } from "@/pages/Games";
+import { Leaderboard } from "@/pages/Leaderboard";
+import { ChickenFightPage } from "@/pages/ChickenFightPage";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js';
-import type { PlayerType } from './types';
+import type { PlayerType } from '@/types';
 
-// Auth wrapper component
 function AppContent() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -22,7 +26,6 @@ function AppContent() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -37,7 +40,6 @@ function AppContent() {
       }
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -95,7 +97,6 @@ function AppContent() {
     }
 
     try {
-      // Check if username already exist
       const exists = await checkUsernameExists(username);
       if (exists) {
         setAuthError("This username is already taken !");
@@ -103,7 +104,6 @@ function AppContent() {
         return;
       }
 
-      // Create user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -112,7 +112,6 @@ function AppContent() {
       if (error) {
         setAuthError(error.message);
       } else if (data.user) {
-        // Create player with associated username
         try {
           const newPlayer = await createPlayer(data.user.id, username);
           setPlayer(newPlayer);
@@ -132,110 +131,107 @@ function AppContent() {
     setPlayer(null);
   };
 
-  // Show auth error
   if (authError) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <h1 className="text-2xl font-bold mb-4">Authentication</h1>
-          <p className="text-red-500 mb-4">✗ Erreur : {authError}</p>
-          <button 
-            className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" 
-            onClick={() => setAuthError(null)}
-          >
-            Retour
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Authentication</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert variant="destructive">
+              <AlertDescription>✗ Erreur : {authError}</AlertDescription>
+            </Alert>
+            <Button onClick={() => setAuthError(null)} className="w-full">
+              Retour
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Show login/signup form if not authenticated
   if (!user || !player) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <h1 className="text-3xl font-bold text-center mb-2">GoGoGambling</h1>
-          <p className="text-center text-gray-600 mb-6">
-            {isSignUp ? "Créer un compte" : "Connexion"}
-          </p>
-          
-          <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
-            {isSignUp && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nom d'utilisateur
-                </label>
-                <input
-                  type="text"
-                  placeholder="Votre pseudo"
-                  value={username}
-                  required={isSignUp}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <div className="min-h-screen flex items-center justify-center bg-muted p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl">GoGoGambling</CardTitle>
+            <CardDescription>
+              {isSignUp ? "Créer un compte" : "Connexion"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <Label htmlFor="username">Nom d'utilisateur</Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="Votre pseudo"
+                    value={username}
+                    required={isSignUp}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="votre@email.com"
+                  value={email}
+                  required
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-            )}
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="votre@email.com"
-                value={email}
-                required
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Mot de passe
-              </label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                required
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  required
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors"
-            >
-              {loading ? "Chargement..." : (isSignUp ? "Créer un compte" : "Se connecter")}
-            </button>
-          </form>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full"
+              >
+                {loading ? "Chargement..." : (isSignUp ? "Créer un compte" : "Se connecter")}
+              </Button>
+            </form>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setAuthError(null);
-              }}
-              className="text-blue-500 hover:text-blue-700 text-sm"
-            >
-              {isSignUp 
-                ? "Déjà un compte ? Se connecter" 
-                : "Pas de compte ? Créer un compte"}
-            </button>
-          </div>
-        </div>
+            <div className="mt-4 text-center">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setAuthError(null);
+                }}
+              >
+                {isSignUp 
+                  ? "Déjà un compte ? Se connecter" 
+                  : "Pas de compte ? Créer un compte"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
-  // Authenticated app with routes
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Header playerName={player.player_name} onLogout={handleLogout} />
       
       <main>
