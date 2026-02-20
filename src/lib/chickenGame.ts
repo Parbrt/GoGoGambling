@@ -112,11 +112,6 @@ export function calculateBets(population: [number, number][], userBet: number = 
     }
   }
 
-  if (userChoice === 1) {
-    betA += userBet;
-  } else if (userChoice === 2) {
-    betB += userBet;
-  }
 
   let multiplier: number;
   let display: string;
@@ -126,13 +121,13 @@ export function calculateBets(population: [number, number][], userBet: number = 
   const safeBetA = Math.max(betA, MIN_BET);
   const safeBetB = Math.max(betB, MIN_BET);
 
-  if (betA > betB) {
-    multiplier = safeBetA / safeBetB;
+  if (userChoice === 1) {
+    multiplier = (safeBetA + safeBetB + bet)/ (safeBetA + bet);
     // Limiter le multiplicateur maximum à 10.0
     multiplier = Math.min(multiplier, 10.0);
     display = `${multiplier.toFixed(2)}:1`;
   } else {
-    multiplier = safeBetB / safeBetA;
+    multiplier = (safeBetB + safeBetA + bet)/ (safeBetB + bet);
     // Limiter le multiplicateur maximum à 10.0
     multiplier = Math.min(multiplier, 10.0);
     display = `1:${multiplier.toFixed(2)}`;
