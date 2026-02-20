@@ -38,12 +38,15 @@ export function ChickenFight({
 }: ChickenFightProps) {
   const [chickenA, setChickenA] = useState<Chicken>(() => createChicken());
   const [chickenB, setChickenB] = useState<Chicken>(() => createChicken());
-  const [population, setPopulation] = useState<[number, number][]>(
-    generatePopulation()
-  );
-  const [betInfo, setBetInfo] = useState<BetInfo>(() =>
-    calculateBets(generatePopulation())
-  );
+  // Utiliser une fonction d'initialisation unique pour garantir la cohérence
+  const initialData = useState(() => {
+    const pop = generatePopulation();
+    const bets = calculateBets(pop);
+    return { population: pop, betInfo: bets };
+  })[0];
+  
+  const [population, setPopulation] = useState<[number, number][]>(initialData.population);
+  const [betInfo, setBetInfo] = useState<BetInfo>(initialData.betInfo);
   const [selectedChicken, setSelectedChicken] = useState<1 | 2 | null>(null);
   const [betAmount, setBetAmount] = useState<number>(0);
   const [phase, setPhase] = useState<GamePhase>("betting");
@@ -67,7 +70,13 @@ export function ChickenFight({
   };
 
   const handleStartFight = async () => {
-    if (!selectedChicken || betAmount <= 0) return;
+    if (!selectedChicken || betAmount <= 0 || betAmount > currentPoints) return;
+    
+    // Vérifier que le multiplicateur est valide
+    if (!isFinite(betInfo.multiplier) || betInfo.multiplier < 0) {
+      setError("Erreur de calcul des cotes. Veuillez réessayer.");
+      return;
+    }
 
     setPhase("fighting");
 
@@ -79,7 +88,22 @@ export function ChickenFight({
       const winnings = isWin
         ? calculateWinnings(betAmount, betInfo.multiplier)
         : 0;
+      
+      // Validation des gains
+      if (!isFinite(winnings) || winnings < 0) {
+        setError("Erreur de calcul des gains. Veuillez réessayer.");
+        setPhase("betting");
+        return;
+      }
+      
       const newPoints = currentPoints - betAmount + winnings;
+      
+      // Validation du nouveau total de points
+      if (!isFinite(newPoints) || newPoints < 0) {
+        setError("Erreur de calcul des points. Veuillez réessayer.");
+        setPhase("betting");
+        return;
+      }
 
       try {
         await updatePlayerPoints(userId, newPoints);
@@ -208,26 +232,33 @@ export function ChickenFight({
             {/* Betting Info */}
             <Card className="bg-muted/50">
               <CardContent className="pt-6">
-                <div className="flex justify-between items-center">
-                  <div className="text-center flex-1">
-                    <p className="text-2xl font-bold text-primary">
-                      {betInfo.betA}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Mise totale sur A</p>
+                {!isFinite(betInfo.multiplier) ? (
+                  <div className="text-center text-destructive">
+                    <p className="font-bold">Erreur de calcul des cotes</p>
+                    <p className="text-sm">Veuillez rafraîchir la page</p>
                   </div>
-                  <div className="text-center px-4">
-                    <p className="text-3xl font-bold">
-                      {betInfo.display}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Cote</p>
+                ) : (
+                  <div className="flex justify-between items-center">
+                    <div className="text-center flex-1">
+                      <p className="text-2xl font-bold text-primary">
+                        {betInfo.betA}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Mise totale sur A</p>
+                    </div>
+                    <div className="text-center px-4">
+                      <p className="text-3xl font-bold">
+                        {betInfo.display}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Cote</p>
+                    </div>
+                    <div className="text-center flex-1">
+                      <p className="text-2xl font-bold text-primary">
+                        {betInfo.betB}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Mise totale sur B</p>
+                    </div>
                   </div>
-                  <div className="text-center flex-1">
-                    <p className="text-2xl font-bold text-primary">
-                      {betInfo.betB}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Mise totale sur B</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
 
@@ -265,7 +296,7 @@ export function ChickenFight({
             {/* Start Button */}
             <Button
               onClick={handleStartFight}
-              disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints}
+              disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints || !isFinite(betInfo.multiplier)}
               className="w-full"
               size="lg"
             >
@@ -278,19 +309,38 @@ export function ChickenFight({
 
         {/* Fighting Phase */}
         {phase === "fighting" && (
-          <div className="text-center py-8 space-y-4">
+          <div className="text-center py-8 space-y-6">
             <div className="text-6xl">🥊</div>
             <p className="text-xl font-bold">Le combat est en cours...</p>
             <div className="flex justify-center">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
             </div>
             {fightResult && (
-              <div className="text-sm text-muted-foreground">
-                <p>Caractéristiques du combat:</p>
-                <p className="font-semibold">
-                  {fightResult.statNames.join(" • ")}
-                </p>
-              </div>
+              <Card className="bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-base text-center">Stats sélectionnées</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {fightResult.statNames.map((statName, index) => (
+                      <div key={index} className="flex items-center justify-between px-4">
+                        <span className="font-semibold text-primary">{statName}</span>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">
+                            A: <span className="font-bold text-foreground">{fightResult.chickenAValues[index]}</span>
+                          </span>
+                          <span className="text-muted-foreground">
+                            B: <span className="font-bold text-foreground">{fightResult.chickenBValues[index]}</span>
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            {Math.round(fightResult.weights[index] * 100)}%
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
@@ -324,6 +374,28 @@ export function ChickenFight({
                     <div>
                       <p className="font-semibold text-primary">Poulet B</p>
                       <p>Score: {fightResult.scores.b.toFixed(1)}</p>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="font-semibold text-sm">Stats du combat:</p>
+                    <div className="space-y-2">
+                      {fightResult.statNames.map((statName, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm py-1 px-2 bg-background rounded">
+                          <span className="font-medium">{statName}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-muted-foreground">
+                              A: <span className="font-bold text-primary">{fightResult.chickenAValues[index]}</span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              B: <span className="font-bold text-primary">{fightResult.chickenBValues[index]}</span>
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {Math.round(fightResult.weights[index] * 100)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                   <Separator />

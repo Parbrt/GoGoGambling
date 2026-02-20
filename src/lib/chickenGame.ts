@@ -27,6 +27,10 @@ export interface FightResult {
     a: number;
     b: number;
   };
+  weights: [number, number, number];
+  statIndices: [number, number, number];
+  chickenAValues: [number, number, number];
+  chickenBValues: [number, number, number];
 }
 
 export function fight(chickenA: Chicken, chickenB: Chicken): FightResult {
@@ -47,12 +51,12 @@ export function fight(chickenA: Chicken, chickenB: Chicken): FightResult {
     CHICKEN_STATS[statC]
   ];
 
-  let ponderA = randint(10, 80) / 100;
-  let ponderB = 1;
-  while ((ponderA + ponderB) >= 1) {
-    ponderB = randint(0, 90) / 100;
-  }
-  let ponderC = 1 - (ponderA + ponderB);
+  // Calcul direct sans boucle infinie
+  const ponderA = randint(10, 80) / 100;
+  // ponderB doit être < (1 - ponderA) pour laisser de la place à ponderC
+  const maxPonderB = Math.min(90, Math.floor((1 - ponderA - 0.01) * 100));
+  const ponderB = randint(0, Math.max(0, maxPonderB)) / 100;
+  const ponderC = 1 - (ponderA + ponderB);
 
   const scoreA = ponderA * chickenA[statA] + ponderB * chickenA[statB] + ponderC * chickenA[statC];
   const scoreB = ponderA * chickenB[statA] + ponderB * chickenB[statB] + ponderC * chickenB[statC];
@@ -65,16 +69,27 @@ export function fight(chickenA: Chicken, chickenB: Chicken): FightResult {
     scores: {
       a: scoreA,
       b: scoreB
-    }
+    },
+    weights: [ponderA, ponderB, ponderC],
+    statIndices: stats,
+    chickenAValues: [chickenA[statA], chickenA[statB], chickenA[statC]],
+    chickenBValues: [chickenB[statA], chickenB[statB], chickenB[statC]]
   };
 }
 
 export function generatePopulation(): [number, number][] {
   const sizePop = randint(5, 20);
   const population: [number, number][] = [];
-  for (let i = 0; i < sizePop; i++) {
+  
+  // Garantir qu'il y a au moins un pari sur chaque poulet
+  population.push([0, randint(50, 1000)]); // Au moins un pari sur A
+  population.push([1, randint(50, 1000)]); // Au moins un pari sur B
+  
+  // Remplir le reste de la population aléatoirement
+  for (let i = 2; i < sizePop; i++) {
     population.push([randint(0, 1), randint(20, 5000)]);
   }
+  
   return population;
 }
 
@@ -106,11 +121,20 @@ export function calculateBets(population: [number, number][], userBet: number = 
   let multiplier: number;
   let display: string;
 
+  // Vérification anti-division par zéro
+  const MIN_BET = 1;
+  const safeBetA = Math.max(betA, MIN_BET);
+  const safeBetB = Math.max(betB, MIN_BET);
+
   if (betA > betB) {
-    multiplier = betA / betB;
+    multiplier = safeBetA / safeBetB;
+    // Limiter le multiplicateur maximum à 10.0
+    multiplier = Math.min(multiplier, 10.0);
     display = `${multiplier.toFixed(2)}:1`;
   } else {
-    multiplier = betB / betA;
+    multiplier = safeBetB / safeBetA;
+    // Limiter le multiplicateur maximum à 10.0
+    multiplier = Math.min(multiplier, 10.0);
     display = `1:${multiplier.toFixed(2)}`;
   }
 
@@ -118,5 +142,23 @@ export function calculateBets(population: [number, number][], userBet: number = 
 }
 
 export function calculateWinnings(bet: number, multiplier: number): number {
-  return Math.round(bet * multiplier);
+  // Validation des entrées
+  if (!isFinite(bet) || bet < 0) {
+    console.error('Valeur de mise invalide:', bet);
+    return 0;
+  }
+  if (!isFinite(multiplier) || multiplier < 0) {
+    console.error('Multiplicateur invalide:', multiplier);
+    return bet; // Retourner au moins la mise en cas d'erreur
+  }
+  
+  const winnings = Math.round(bet * multiplier);
+  
+  // S'assurer que le résultat est un nombre valide
+  if (!isFinite(winnings) || winnings < 0) {
+    console.error('Gains calculés invalides:', winnings);
+    return bet;
+  }
+  
+  return winnings;
 }
