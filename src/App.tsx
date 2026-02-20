@@ -1,5 +1,5 @@
 import "./index.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Home } from "@/pages/Home";
@@ -11,14 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js';
 import type { PlayerType } from '@/types';
 
-// Updating test 
-
 function AppContent() {
   const [loading, setLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
@@ -27,40 +27,88 @@ function AppContent() {
   const [player, setPlayer] = useState<PlayerType | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
+  // Initialisation de l'authentification - une seule fois au montage
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+    let isActive = true;
 
-      if (currentUser) {
-        try {
-          const playerData = await getPlayerByUserId(currentUser.id);
-          setPlayer(playerData);
-        } catch (err) {
-          console.error('Erreur lors du chargement du player:', err);
+    const initializeAuth = async () => {
+      try {
+        console.log('Initializing auth...');
+        // Récupérer la session actuelle
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        
+        console.log('Session:', currentUser?.id || 'null');
+
+        if (isActive) {
+          setUser(currentUser);
+
+          if (currentUser) {
+            try {
+              const playerData = await getPlayerByUserId(currentUser.id);
+              console.log('Player data:', playerData);
+              if (isActive) {
+                setPlayer(playerData);
+              }
+            } catch (err) {
+              console.error('Erreur lors du chargement du player:', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lors de l\'initialisation:', err);
+      } finally {
+        console.log('Setting isInitializing to false');
+        if (isActive) {
+          setIsInitializing(false);
         }
       }
-    });
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+    initializeAuth();
 
-      if (currentUser) {
-        try {
-          const playerData = await getPlayerByUserId(currentUser.id);
-          setPlayer(playerData);
-        } catch (err) {
-          console.error('Erreur lors du chargement du player:', err);
+    // S'abonner aux changements d'état d'authentification
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
+        if (!isActive) return;
+
+        const currentUser = session?.user ?? null;
+        
+        switch (event) {
+          case 'SIGNED_IN':
+          case 'TOKEN_REFRESHED':
+            setUser(currentUser);
+            if (currentUser) {
+              try {
+                const playerData = await getPlayerByUserId(currentUser.id);
+                if (isActive) {
+                  setPlayer(playerData);
+                }
+              } catch (err) {
+                console.error('Erreur lors du chargement du player:', err);
+              }
+            }
+            break;
+            
+          case 'SIGNED_OUT':
+            setUser(null);
+            setPlayer(null);
+            break;
+            
+          case 'USER_UPDATED':
+            setUser(currentUser);
+            break;
         }
-      } else {
-        setPlayer(null);
       }
-    });
+    );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('Cleanup - setting isActive to false');
+      isActive = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleLogin = async (event: React.FormEvent) => {
@@ -68,23 +116,29 @@ function AppContent() {
     setLoading(true);
     setAuthError(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setAuthError(error.message);
-    } else if (data.user) {
-      try {
-        await updateLastLogin(data.user.id);
-        const playerData = await getPlayerByUserId(data.user.id);
-        setPlayer(playerData);
-      } catch (err) {
-        console.error('Erreur lors du chargement du player:', err);
+      if (error) {
+        setAuthError(error.message);
+      } else if (data.user) {
+        setUser(data.user);
+        try {
+          await updateLastLogin(data.user.id);
+          const playerData = await getPlayerByUserId(data.user.id);
+          setPlayer(playerData);
+        } catch (err) {
+          console.error('Erreur lors du chargement du player:', err);
+        }
       }
+    } catch (err: any) {
+      setAuthError(err.message || "Erreur de connexion");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSignUp = async (event: React.FormEvent) => {
@@ -101,7 +155,7 @@ function AppContent() {
     try {
       const exists = await checkUsernameExists(username);
       if (exists) {
-        setAuthError("This username is already taken !");
+        setAuthError("Ce nom d'utilisateur est déjà pris !");
         setLoading(false);
         return;
       }
@@ -117,21 +171,46 @@ function AppContent() {
         try {
           const newPlayer = await createPlayer(data.user.id, username);
           setPlayer(newPlayer);
-          alert("Account created successfuly");
+          setUser(data.user);
         } catch (err: any) {
           setAuthError("Compte créé mais erreur lors de la création du profil: " + err.message);
         }
       }
     } catch (err: any) {
-      setAuthError(err.message);
+      setAuthError(err.message || "Erreur d'inscription");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setPlayer(null);
-  };
+  const handleLogout = useCallback(async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.signOut();
+      setUser(null);
+      setPlayer(null);
+      setEmail("");
+      setPassword("");
+      setUsername("");
+    } catch (err) {
+      console.error('Erreur lors de la déconnexion:', err);
+      setAuthError("Erreur lors de la déconnexion");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Écran de chargement initial
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (authError) {
     return (
@@ -208,7 +287,14 @@ function AppContent() {
                 disabled={loading}
                 className="w-full"
               >
-                {loading ? "Chargement..." : (isSignUp ? "Créer un compte" : "Se connecter")}
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Chargement...
+                  </>
+                ) : (
+                  isSignUp ? "Créer un compte" : "Se connecter"
+                )}
               </Button>
             </form>
 

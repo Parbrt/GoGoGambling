@@ -1,6 +1,5 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
 
 interface HeaderProps {
   playerName: string;
@@ -8,14 +7,6 @@ interface HeaderProps {
 }
 
 export function Header({ playerName, onLogout }: HeaderProps) {
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    onLogout();
-    navigate("/");
-  };
-
   return (
     <header className="bg-primary text-primary-foreground shadow-lg sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +31,7 @@ export function Header({ playerName, onLogout }: HeaderProps) {
           {/* Droite : Déconnexion */}
           <div className="flex items-center space-x-4">
             <span className="text-sm text-primary-foreground/70">{playerName}</span>
-            <Button variant="destructive" onClick={handleLogout}>
+            <Button variant="destructive" onClick={onLogout}>
               Déconnexion
             </Button>
           </div>
