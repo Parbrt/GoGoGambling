@@ -15,7 +15,7 @@ import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateL
 import type { User } from '@supabase/supabase-js';
 import type { PlayerType } from '@/types';
 
-// Updating
+// Updating test 
 
 function AppContent() {
   const [loading, setLoading] = useState(false);
