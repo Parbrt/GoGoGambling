@@ -15,6 +15,8 @@ import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateL
 import type { User } from '@supabase/supabase-js';
 import type { PlayerType } from '@/types';
 
+// Updating
+
 function AppContent() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
@@ -176,7 +178,7 @@ function AppContent() {
                   />
                 </div>
               )}
-              
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -188,7 +190,7 @@ function AppContent() {
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe</Label>
                 <Input
@@ -219,8 +221,8 @@ function AppContent() {
                   setAuthError(null);
                 }}
               >
-                {isSignUp 
-                  ? "Déjà un compte ? Se connecter" 
+                {isSignUp
+                  ? "Déjà un compte ? Se connecter"
                   : "Pas de compte ? Créer un compte"}
               </Button>
             </div>
@@ -233,29 +235,29 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <Header playerName={player.player_name} onLogout={handleLogout} />
-      
+
       <main>
         <Routes>
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
-              <Home 
-                user={user} 
-                player={player} 
+              <Home
+                user={user}
+                player={player}
                 onPlayerUpdate={setPlayer}
               />
-            } 
+            }
           />
           <Route path="/games" element={<Games />} />
-          <Route 
-            path="/games/chicken-fight" 
+          <Route
+            path="/games/chicken-fight"
             element={
-              <ChickenFightPage 
+              <ChickenFightPage
                 userId={user.id}
                 player={player}
                 onPlayerUpdate={setPlayer}
               />
-            } 
+            }
           />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
