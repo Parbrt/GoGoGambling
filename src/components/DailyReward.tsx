@@ -47,21 +47,48 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
   };
 
   const checkIfCanClaim = (lastLogin: string) => {
-    const lastLoginDate = new Date(lastLogin);
     const now = new Date();
-    const diffTime = now.getTime() - lastLoginDate.getTime();
-    const diffHours = diffTime / (1000 * 3600);
-
-    if (diffHours >= 24) {
-      setCanClaim(true);
-    } else {
+    const lastClaimDate = new Date(lastLogin);
+    
+    // Heure de récompense : 9h00
+    const REWARD_HOUR = 9;
+    const REWARD_MINUTE = 0;
+    
+    // Date d'aujourd'hui à 9h00
+    const todayAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), REWARD_HOUR, REWARD_MINUTE);
+    
+    // Date de demain à 9h00
+    const tomorrowAt9 = new Date(todayAt9);
+    tomorrowAt9.setDate(tomorrowAt9.getDate() + 1);
+    
+    // Date d'hier à 9h00
+    const yesterdayAt9 = new Date(todayAt9);
+    yesterdayAt9.setDate(yesterdayAt9.getDate() - 1);
+    
+    // Vérifier si la dernière réclamation était aujourd'hui après 9h
+    const claimedTodayAfter9 = lastClaimDate >= todayAt9;
+    
+    // Vérifier si la dernière réclamation était hier après 9h et on est avant 9h aujourd'hui
+    const claimedYesterdayAfter9 = lastClaimDate >= yesterdayAt9 && lastClaimDate < todayAt9;
+    const before9Today = now < todayAt9;
+    
+    if (claimedTodayAfter9) {
+      // Déjà réclamé aujourd'hui, prochaine demain à 9h
       setCanClaim(false);
-
-      const nextClaim = new Date(lastLoginDate.getTime() + 24 * 60 * 60 * 1000);
-      const remaining = nextClaim.getTime() - now.getTime();
+      const remaining = tomorrowAt9.getTime() - now.getTime();
       const hours = Math.floor(remaining / (1000 * 60 * 60));
       const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
       setTimeRemaining(`${hours}h ${minutes}m`);
+    } else if (claimedYesterdayAfter9 && before9Today) {
+      // Réclamé hier mais il est trop tôt aujourd'hui, attendre 9h
+      setCanClaim(false);
+      const remaining = todayAt9.getTime() - now.getTime();
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      setTimeRemaining(`${hours}h ${minutes}m`);
+    } else {
+      // Récompense disponible (soit on est après 9h et pas réclamé aujourd'hui, soit nouveau joueur)
+      setCanClaim(true);
     }
   };
 
@@ -98,7 +125,7 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     return (
       <div className="text-sm text-muted-foreground mt-4">
         {!canClaim && timeRemaining && (
-          <Badge variant="outline">Prochaine récompense dans : {timeRemaining}</Badge>
+          <Badge variant="outline">Prochaine récompense à 9h00 (dans {timeRemaining})</Badge>
         )}
       </div>
     );
@@ -123,6 +150,7 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
           <Card className="bg-yellow-50 border-yellow-200">
             <CardContent className="pt-6 text-center">
               <p className="text-yellow-800 font-bold text-xl">+50 points</p>
+              <p className="text-sm text-yellow-600 mt-1">Disponible tous les jours à 9h00</p>
             </CardContent>
           </Card>
 
