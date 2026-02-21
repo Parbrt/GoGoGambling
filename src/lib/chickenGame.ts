@@ -80,24 +80,26 @@ export function fight(chickenA: Chicken, chickenB: Chicken): FightResult {
 export function generatePopulation(): [number, number][] {
   const sizePop = randint(5, 20);
   const population: [number, number][] = [];
-  
+
   // Garantir qu'il y a au moins un pari sur chaque poulet
   population.push([0, randint(50, 1000)]); // Au moins un pari sur A
   population.push([1, randint(50, 1000)]); // Au moins un pari sur B
-  
+
   // Remplir le reste de la population aléatoirement
   for (let i = 2; i < sizePop; i++) {
     population.push([randint(0, 1), randint(20, 5000)]);
   }
-  
+
   return population;
 }
 
 export interface BetInfo {
   betA: number;
   betB: number;
-  multiplier: number;
-  display: string;
+  oddsA: number;
+  oddsB: number;
+  displayA: string;
+  displayB: string;
 }
 
 export function calculateBets(population: [number, number][], userBet: number = 0, userChoice: 1 | 2 | null = null): BetInfo {
@@ -112,28 +114,36 @@ export function calculateBets(population: [number, number][], userBet: number = 
     }
   }
 
-
-  let multiplier: number;
-  let display: string;
+  // Ajouter la mise de l'utilisateur
+  if (userChoice === 1) {
+    betA += userBet;
+  } else if (userChoice === 2) {
+    betB += userBet;
+  }
 
   // Vérification anti-division par zéro
   const MIN_BET = 1;
   const safeBetA = Math.max(betA, MIN_BET);
   const safeBetB = Math.max(betB, MIN_BET);
 
-  if (userChoice === 1) {
-    multiplier = (safeBetA + safeBetB + bet)/ (safeBetA + bet);
-    // Limiter le multiplicateur maximum à 10.0
-    multiplier = Math.min(multiplier, 10.0);
-    display = `${multiplier.toFixed(2)}:1`;
-  } else {
-    multiplier = (safeBetB + safeBetA + bet)/ (safeBetB + bet);
-    // Limiter le multiplicateur maximum à 10.0
-    multiplier = Math.min(multiplier, 10.0);
-    display = `1:${multiplier.toFixed(2)}`;
-  }
+  // Calcul des cotes selon la formule demandée:
+  // pour poulet a: 1 : (safeBetA + safeBetB) / safeBetA
+  // pour poulet b: 1 : (safeBetB + safeBetA) / safeBetB
+  const oddsA = (safeBetA + safeBetB) / safeBetA;
+  const oddsB = (safeBetB + safeBetA) / safeBetB;
 
-  return { betA, betB, multiplier, display };
+  // Limiter les cotes maximum à 10.0
+  const finalOddsA = Math.min(oddsA, 10.0);
+  const finalOddsB = Math.min(oddsB, 10.0);
+
+  return { 
+    betA, 
+    betB, 
+    oddsA: finalOddsA, 
+    oddsB: finalOddsB,
+    displayA: `1:${finalOddsA.toFixed(2)}`,
+    displayB: `1:${finalOddsB.toFixed(2)}`
+  };
 }
 
 export function calculateWinnings(bet: number, multiplier: number): number {
@@ -146,14 +156,14 @@ export function calculateWinnings(bet: number, multiplier: number): number {
     console.error('Multiplicateur invalide:', multiplier);
     return bet; // Retourner au moins la mise en cas d'erreur
   }
-  
+
   const winnings = Math.round(bet * multiplier);
-  
+
   // S'assurer que le résultat est un nombre valide
   if (!isFinite(winnings) || winnings < 0) {
     console.error('Gains calculés invalides:', winnings);
     return bet;
   }
-  
+
   return winnings;
 }

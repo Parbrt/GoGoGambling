@@ -72,8 +72,9 @@ export function ChickenFight({
   const handleStartFight = async () => {
     if (!selectedChicken || betAmount <= 0 || betAmount > currentPoints) return;
     
-    // Vérifier que le multiplicateur est valide
-    if (!isFinite(betInfo.multiplier) || betInfo.multiplier < 0) {
+    // Vérifier que la cote du poulet sélectionné est valide
+    const selectedOdds = selectedChicken === 1 ? betInfo.oddsA : betInfo.oddsB;
+    if (!isFinite(selectedOdds) || selectedOdds < 0) {
       setError("Erreur de calcul des cotes. Veuillez réessayer.");
       return;
     }
@@ -85,8 +86,9 @@ export function ChickenFight({
       setFightResult(result);
 
       const isWin = selectedChicken === result.winner;
+      const selectedOdds = selectedChicken === 1 ? betInfo.oddsA : betInfo.oddsB;
       const winnings = isWin
-        ? calculateWinnings(betAmount, betInfo.multiplier)
+        ? calculateWinnings(betAmount, selectedOdds)
         : 0;
       
       // Validation des gains
@@ -232,7 +234,7 @@ export function ChickenFight({
             {/* Betting Info */}
             <Card className="bg-muted/50">
               <CardContent className="pt-6">
-                {!isFinite(betInfo.multiplier) ? (
+                {!isFinite(betInfo.oddsA) || !isFinite(betInfo.oddsB) ? (
                   <div className="text-center text-destructive">
                     <p className="font-bold">Erreur de calcul des cotes</p>
                     <p className="text-sm">Veuillez rafraîchir la page</p>
@@ -240,22 +242,23 @@ export function ChickenFight({
                 ) : (
                   <div className="flex justify-between items-center">
                     <div className="text-center flex-1">
-                      <p className="text-2xl font-bold text-primary">
-                        {betInfo.betA}
+                      <p className="text-xl font-bold text-primary">
+                        {betInfo.displayA}
                       </p>
-                      <p className="text-sm text-muted-foreground">Mise totale sur A</p>
+                      <p className="text-sm text-muted-foreground">Cote Poulet A</p>
+                      <p className="text-lg font-semibold mt-1">{betInfo.betA}</p>
+                      <p className="text-xs text-muted-foreground">Mise totale</p>
                     </div>
                     <div className="text-center px-4">
-                      <p className="text-3xl font-bold">
-                        {betInfo.display}
-                      </p>
-                      <p className="text-sm text-muted-foreground">Cote</p>
+                      <p className="text-2xl font-bold text-muted-foreground">VS</p>
                     </div>
                     <div className="text-center flex-1">
-                      <p className="text-2xl font-bold text-primary">
-                        {betInfo.betB}
+                      <p className="text-xl font-bold text-primary">
+                        {betInfo.displayB}
                       </p>
-                      <p className="text-sm text-muted-foreground">Mise totale sur B</p>
+                      <p className="text-sm text-muted-foreground">Cote Poulet B</p>
+                      <p className="text-lg font-semibold mt-1">{betInfo.betB}</p>
+                      <p className="text-xs text-muted-foreground">Mise totale</p>
                     </div>
                   </div>
                 )}
@@ -296,7 +299,7 @@ export function ChickenFight({
             {/* Start Button */}
             <Button
               onClick={handleStartFight}
-              disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints || !isFinite(betInfo.multiplier)}
+              disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints || (!isFinite(betInfo.oddsA) || !isFinite(betInfo.oddsB))}
               className="w-full"
               size="lg"
             >
