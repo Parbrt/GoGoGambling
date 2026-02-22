@@ -18,37 +18,33 @@ interface DailyRewardProps {
   onRewardClaimed?: () => void;
 }
 
+// Clé localStorage pour stocker la dernière réclamation
+const getStorageKey = (userId: string) => `dailyReward_${userId}`;
+
 export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
   const [player, setPlayer] = useState<PlayerType | null>(null);
   const [canClaim, setCanClaim] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('');
-  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   useEffect(() => {
     loadPlayer();
   }, [userId]);
 
   useEffect(() => {
-    if (canClaim && !rewardClaimed) {
+    if (canClaim) {
       setShowModal(true);
     }
-  }, [canClaim, rewardClaimed]);
+  }, [canClaim]);
 
   const loadPlayer = async () => {
     const playerData = await getPlayerByUserId(userId);
     setPlayer(playerData);
-
-    if (playerData?.last_login) {
-      checkIfCanClaim(playerData.last_login);
-    } else {
-      setCanClaim(true);
-    }
+    checkIfCanClaim();
   };
 
-  const checkIfCanClaim = (lastLogin: string) => {
+  const checkIfCanClaim = () => {
     const now = new Date();
-    const lastClaimDate = new Date(lastLogin);
     
     // Heure de récompense : 9h00
     const REWARD_HOUR = 9;
@@ -61,35 +57,34 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     const tomorrowAt9 = new Date(todayAt9);
     tomorrowAt9.setDate(tomorrowAt9.getDate() + 1);
     
-    // Date d'hier à 9h00
-    const yesterdayAt9 = new Date(todayAt9);
-    yesterdayAt9.setDate(yesterdayAt9.getDate() - 1);
+    // Récupérer la dernière réclamation depuis localStorage
+    const storageKey = getStorageKey(userId);
+    const lastClaimStr = localStorage.getItem(storageKey);
+    const lastClaimDate = lastClaimStr ? new Date(lastClaimStr) : null;
     
-    // Vérifier si la dernière réclamation était aujourd'hui après 9h
-    const claimedTodayAfter9 = lastClaimDate >= todayAt9;
+    // Vérifier si on peut réclamer
+    let canClaimReward = false;
     
-    // Vérifier si la dernière réclamation était hier après 9h et on est avant 9h aujourd'hui
-    const claimedYesterdayAfter9 = lastClaimDate >= yesterdayAt9 && lastClaimDate < todayAt9;
-    const before9Today = now < todayAt9;
-    
-    if (claimedTodayAfter9) {
-      // Déjà réclamé aujourd'hui, prochaine demain à 9h
-      setCanClaim(false);
-      const remaining = tomorrowAt9.getTime() - now.getTime();
-      const hours = Math.floor(remaining / (1000 * 60 * 60));
-      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeRemaining(`${hours}h ${minutes}m`);
-    } else if (claimedYesterdayAfter9 && before9Today) {
-      // Réclamé hier mais il est trop tôt aujourd'hui, attendre 9h
-      setCanClaim(false);
-      const remaining = todayAt9.getTime() - now.getTime();
-      const hours = Math.floor(remaining / (1000 * 60 * 60));
-      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeRemaining(`${hours}h ${minutes}m`);
+    if (!lastClaimDate) {
+      // Jamais réclamé
+      canClaimReward = true;
     } else {
-      // Récompense disponible (soit on est après 9h et pas réclamé aujourd'hui, soit nouveau joueur)
-      setCanClaim(true);
+      // Vérifier si la dernière réclamation était avant aujourd'hui à 9h
+      const lastClaimWasBeforeToday9 = lastClaimDate < todayAt9;
+      
+      if (lastClaimWasBeforeToday9) {
+        canClaimReward = true;
+      } else {
+        // Déjà réclamé aujourd'hui après 9h
+        canClaimReward = false;
+        const remaining = tomorrowAt9.getTime() - now.getTime();
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+        setTimeRemaining(`${hours}h ${minutes}m`);
+      }
     }
+    
+    setCanClaim(canClaimReward);
   };
 
   const claimReward = async () => {
@@ -99,7 +94,6 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
       .from('player')
       .update({
         nb_point: player.nb_point + 50,
-        last_login: new Date().toISOString()
       })
       .eq('user_id', userId);
 
@@ -108,7 +102,10 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
       return;
     }
 
-    setRewardClaimed(true);
+    // Sauvegarder la date de réclamation dans localStorage
+    const storageKey = getStorageKey(userId);
+    localStorage.setItem(storageKey, new Date().toISOString());
+
     setShowModal(false);
     setCanClaim(false);
 
@@ -121,10 +118,10 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
     setShowModal(false);
   };
 
-  if (!canClaim || rewardClaimed) {
+  if (!canClaim) {
     return (
       <div className="text-sm text-muted-foreground mt-4">
-        {!canClaim && timeRemaining && (
+        {timeRemaining && (
           <Badge variant="outline">Prochaine récompense à 9h00 (dans {timeRemaining})</Badge>
         )}
       </div>
@@ -141,7 +138,7 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
             </div>
             <DialogTitle className="text-2xl">Récompense Quotidienne !</DialogTitle>
             <DialogDescription>
-              {player?.last_login
+              {localStorage.getItem(getStorageKey(userId))
                 ? "Vous êtes de retour ! Voici votre récompense pour aujourd'hui."
                 : "Bienvenue ! Profitez de votre première récompense."}
             </DialogDescription>
@@ -165,7 +162,7 @@ export function DailyReward({ userId, onRewardClaimed }: DailyRewardProps) {
         </DialogContent>
       </Dialog>
 
-      {!showModal && canClaim && !rewardClaimed && (
+      {!showModal && canClaim && (
         <Button
           onClick={() => setShowModal(true)}
           className="fixed bottom-4 right-4 gap-2"
