@@ -6,6 +6,7 @@ import { Home } from "@/pages/Home";
 import { Games } from "@/pages/Games";
 import { Leaderboard } from "@/pages/Leaderboard";
 import { ChickenFightPage } from "@/pages/ChickenFightPage";
+import { RoulettePage } from "@/pages/RoulettePage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -339,6 +340,16 @@ function AppContent() {
             path="/games/chicken-fight"
             element={
               <ChickenFightPage
+                userId={user.id}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route
+            path="/games/roulette"
+            element={
+              <RoulettePage
                 userId={user.id}
                 player={player}
                 onPlayerUpdate={setPlayer}
