@@ -21,6 +21,14 @@ const games: Game[] = [
     path: "/games/chicken-fight",
     color: "bg-yellow-500",
   },
+  {
+    id: "roulette",
+    name: "Roulette",
+    description: "Pariez sur les bon chiffres pour remporter la mise",
+    icon: "🍀",
+    path: "/games/roulette",
+    color: "bg-red-500",
+  }
 ];
 
 export function Games() {
