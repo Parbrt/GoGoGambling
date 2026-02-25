@@ -30,7 +30,9 @@ export function Header({ playerName, onLogout }: HeaderProps) {
 
           {/* Droite : Déconnexion */}
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-primary-foreground/70">{playerName}</span>
+            <Link to="/profile" className="text-sm text-primary-foreground/70 hover:text-primary-foreground transition-colors">
+              {playerName}
+            </Link>
             <Button variant="destructive" onClick={onLogout}>
               Déconnexion
             </Button>

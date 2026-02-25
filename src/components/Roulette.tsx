@@ -159,7 +159,7 @@ export function Roulette({
     const isWinning = winnings > 0;
     setIsWin(isWinning);
 
-    const newPoints = currentPoints - betAmount + winnings;
+    const newPoints = Math.round(currentPoints - betAmount + winnings);
 
     if (!isFinite(newPoints) || newPoints < 0) {
       setError("Erreur de calcul des points. Veuillez réessayer.");

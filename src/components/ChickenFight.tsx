@@ -98,7 +98,7 @@ export function ChickenFight({
         return;
       }
       
-      const newPoints = currentPoints - betAmount + winnings;
+      const newPoints = Math.round(currentPoints - betAmount + winnings);
       
       // Validation du nouveau total de points
       if (!isFinite(newPoints) || newPoints < 0) {
