@@ -59,7 +59,7 @@ export function ShareTrading({
     return () => clearInterval(interval);
   }, [snapshot, player]);
 
-  const FEE_RATE = 0.05; // 5% de frais sur les achats
+  const FEE_RATE = 0.02; // 5% de frais sur les achats
 
   const handleBuy = (shareType: 'A' | 'B') => {
     const qty = shareType === 'A' ? buyQty.A : buyQty.B;
