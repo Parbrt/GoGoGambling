@@ -140,6 +140,50 @@ export function SlotMachine({
     setError(null);
   };
 
+  const handleRespin = () => {
+    setSlotResult(null);
+    setDisplayNumbers([0, 0, 0, 0, 0]);
+    setError(null);
+    // Relancer directement sans repasser par la phase betting
+    setPhase("spinning");
+
+    const animationInterval = setInterval(() => {
+      setDisplayNumbers(spin());
+    }, 100);
+
+    setTimeout(async () => {
+      clearInterval(animationInterval);
+
+      const numbers = spin();
+      setDisplayNumbers(numbers);
+
+      const currentJackpot = await getSlotMachineJackpot();
+      const result = calculateReward(numbers, betAmount, currentJackpot);
+      setSlotResult(result);
+
+      const newPlayerPoints = currentPoints - betAmount + result.reward;
+      const newMachinePoints = currentJackpot + betAmount - result.reward;
+
+      if (!isFinite(newPlayerPoints) || newPlayerPoints < 0) {
+        setError("Erreur de calcul des points.");
+        setPhase("betting");
+        return;
+      }
+
+      try {
+        await updatePlayerPoints(userId, Math.round(newPlayerPoints));
+        onPointsUpdate(Math.round(newPlayerPoints));
+        await updateSlotMachineJackpot(newMachinePoints);
+        setMachinePoints(newMachinePoints <= 0 ? 10000 : Math.round(newMachinePoints));
+      } catch (err) {
+        setError("Erreur lors de la mise à jour");
+        console.error(err);
+      }
+
+      setPhase("result");
+    }, 2000);
+  };
+
   const getNumberColor = (num: number): string => {
     if (num === 7) return "text-red-600"; // Jackpot
     if (num === 8 || num === 9) return "text-purple-600"; // High value
@@ -233,17 +277,20 @@ export function SlotMachine({
                 />
               </div>
               <div className="flex justify-between gap-2">
-                <Button variant="outline" onClick={() => handleBetChange(10)} className="flex-1">
-                  10
+                <Button variant="outline" onClick={() => handleBetChange(betAmount + 10)} className="flex-1">
+                  +10
                 </Button>
-                <Button variant="outline" onClick={() => handleBetChange(50)} className="flex-1">
-                  50
+                <Button variant="outline" onClick={() => handleBetChange(betAmount + 50)} className="flex-1">
+                  +50
                 </Button>
-                <Button variant="outline" onClick={() => handleBetChange(100)} className="flex-1">
-                  100
+                <Button variant="outline" onClick={() => handleBetChange(betAmount + 100)} className="flex-1">
+                  +100
                 </Button>
-                <Button variant="outline" onClick={() => handleBetChange(500)} className="flex-1">
-                  500
+                <Button variant="outline" onClick={() => handleBetChange(betAmount + 500)} className="flex-1">
+                  +500
+                </Button>
+                <Button variant="outline" onClick={() => handleBetChange(betAmount + 1000)} className="flex-1">
+                  +1000
                 </Button>
                 <Button variant="secondary" onClick={() => handleBetChange(currentPoints)} className="flex-1">
                   Max
@@ -310,8 +357,16 @@ export function SlotMachine({
         {/* Result Phase */}
         {phase === "result" && (
           <div className="text-center space-y-4">
-            <Button onClick={handleNextSpin} size="lg" className="w-full">
-              Rejouer
+            <Button
+              onClick={handleRespin}
+              disabled={betAmount <= 0 || betAmount > currentPoints}
+              size="lg"
+              className="w-full"
+            >
+              Relancer ({betAmount} pts)
+            </Button>
+            <Button onClick={handleNextSpin} size="lg" variant="outline" className="w-full">
+              Changer la mise
             </Button>
           </div>
         )}

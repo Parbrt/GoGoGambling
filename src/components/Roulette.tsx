@@ -330,14 +330,17 @@ export function Roulette({
                   />
                 </div>
                 <div className="flex justify-between gap-2">
-                  <Button variant="outline" onClick={() => handleBetAmountChange(10)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetAmountChange(betAmount + 10)} className="flex-1">
                     +10
                   </Button>
-                  <Button variant="outline" onClick={() => handleBetAmountChange(50)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetAmountChange(betAmount + 50)} className="flex-1">
                     +50
                   </Button>
-                  <Button variant="outline" onClick={() => handleBetAmountChange(100)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetAmountChange(betAmount + 100)} className="flex-1">
                     +100
+                  </Button>
+                  <Button variant="outline" onClick={() => handleBetAmountChange(betAmount + 1000)} className="flex-1">
+                    +1000
                   </Button>
                   <Button variant="secondary" onClick={() => handleBetAmountChange(currentPoints)} className="flex-1">
                     All-In

@@ -280,14 +280,17 @@ export function ChickenFight({
                   />
                 </div>
                 <div className="flex justify-between gap-2">
-                  <Button variant="outline" onClick={() => handleBetChange(10)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetChange(betAmount + 10)} className="flex-1">
                     +10
                   </Button>
-                  <Button variant="outline" onClick={() => handleBetChange(50)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetChange(betAmount + 50)} className="flex-1">
                     +50
                   </Button>
-                  <Button variant="outline" onClick={() => handleBetChange(100)} className="flex-1">
+                  <Button variant="outline" onClick={() => handleBetChange(betAmount + 100)} className="flex-1">
                     +100
+                  </Button>
+                  <Button variant="outline" onClick={() => handleBetChange(betAmount + 1000)} className="flex-1">
+                    +1000
                   </Button>
                   <Button variant="secondary" onClick={() => handleBetChange(currentPoints)} className="flex-1">
                     All-In
