@@ -1,5 +1,5 @@
 import "./index.css";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Home } from "@/pages/Home";
@@ -7,15 +7,118 @@ import { Games } from "@/pages/Games";
 import { Leaderboard } from "@/pages/Leaderboard";
 import { ChickenFightPage } from "@/pages/ChickenFightPage";
 import { RoulettePage } from "@/pages/RoulettePage";
+import { SlotMachinePage } from "@/pages/SlotMachinePage";
+import { Profile } from "@/pages/Profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin } from '@/lib/supabase'
+import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin, setPlayerOnline } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js';
 import type { PlayerType } from '@/types';
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationContainer } from "@/components/NotificationContainer";
+import { useAutoNotifications } from "@/hooks/useAutoNotifications";
+import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
+
+// Timeout pour l'initialisation (3 secondes max)
+const INIT_TIMEOUT = 3000;
+
+function AuthenticatedApp({ user, player, setPlayer, handleLogout }: { 
+  user: User; 
+  player: PlayerType; 
+  setPlayer: (p: PlayerType) => void;
+  handleLogout: () => void;
+}) {
+  // Active les notifications automatiques
+  useAutoNotifications({ currentUserId: user.id, currentPlayer: player });
+  useGlobalNotifications({ currentUserId: user.id });
+
+  // Gérer le statut en ligne
+  useEffect(() => {
+    // Marquer comme en ligne au chargement
+    setPlayerOnline(user.id, true).catch(console.error);
+
+    // Marquer comme hors ligne à la fermeture
+    const handleBeforeUnload = () => {
+      setPlayerOnline(user.id, false);
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      setPlayerOnline(user.id, false).catch(console.error);
+    };
+  }, [user.id]);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <NotificationContainer />
+      <Header playerName={player.player_name} onLogout={handleLogout} />
+
+      <main>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Home
+                user={user}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route path="/games" element={<Games />} />
+          <Route
+            path="/games/chicken-fight"
+            element={
+              <ChickenFightPage
+                userId={user.id}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route
+            path="/games/roulette"
+            element={
+              <RoulettePage
+                userId={user.id}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route
+            path="/games/slot-machine"
+            element={
+              <SlotMachinePage
+                userId={user.id}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <Profile
+                user={user}
+                player={player}
+                onPlayerUpdate={setPlayer}
+              />
+            }
+          />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
 
 function AppContent() {
   const [loading, setLoading] = useState(false);
@@ -27,88 +130,109 @@ function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [player, setPlayer] = useState<PlayerType | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
+  
+  // Ref pour éviter les initialisations multiples
+  const hasInitialized = useRef(false);
 
-  // Initialisation de l'authentification - une seule fois au montage
+  // Initialisation de l'authentification
   useEffect(() => {
-    let isActive = true;
+    // Éviter les exécutions multiples
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let subscription: { unsubscribe: () => void } | null = null;
 
     const initializeAuth = async () => {
       try {
-        console.log('Initializing auth...');
-        // Récupérer la session actuelle
-        const { data: { session } } = await supabase.auth.getSession();
-        const currentUser = session?.user ?? null;
+        console.log('[Auth] Initialisation...');
         
-        console.log('Session:', currentUser?.id || 'null');
+        // Timeout de sécurité
+        timeoutId = setTimeout(() => {
+          console.warn('[Auth] Timeout - affichage du formulaire de connexion');
+          setInitError("Impossible de vérifier la session. Veuillez vous connecter.");
+          setIsInitializing(false);
+        }, INIT_TIMEOUT);
 
-        if (isActive) {
-          setUser(currentUser);
+        // Récupérer la session actuelle
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[Auth] Erreur session:', sessionError);
+          throw sessionError;
+        }
 
-          if (currentUser) {
-            try {
-              const playerData = await getPlayerByUserId(currentUser.id);
-              console.log('Player data:', playerData);
-              if (isActive) {
-                setPlayer(playerData);
-              }
-            } catch (err) {
-              console.error('Erreur lors du chargement du player:', err);
-            }
+        const currentUser = session?.user ?? null;
+        console.log('[Auth] Session:', currentUser ? `User ${currentUser.id}` : 'Aucune');
+
+        setUser(currentUser);
+
+        if (currentUser) {
+          try {
+            const playerData = await getPlayerByUserId(currentUser.id);
+            console.log('[Auth] Player chargé:', playerData ? playerData.player_name : 'null');
+            setPlayer(playerData);
+          } catch (err) {
+            console.error('[Auth] Erreur chargement player:', err);
+            // On continue même sans player - l'utilisateur devra compléter son profil
           }
         }
-      } catch (err) {
-        console.error('Erreur lors de l\'initialisation:', err);
-      } finally {
-        console.log('Setting isInitializing to false');
-        if (isActive) {
-          setIsInitializing(false);
-        }
+
+        // Annuler le timeout si tout s'est bien passé
+        clearTimeout(timeoutId);
+        setIsInitializing(false);
+        
+        // S'abonner aux changements d'état
+        const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
+          async (event, newSession) => {
+            console.log('[Auth] Événement:', event);
+            
+            const newUser = newSession?.user ?? null;
+            
+            switch (event) {
+              case 'SIGNED_IN':
+              case 'TOKEN_REFRESHED':
+                setUser(newUser);
+                if (newUser) {
+                  try {
+                    const playerData = await getPlayerByUserId(newUser.id);
+                    setPlayer(playerData);
+                  } catch (err) {
+                    console.error('[Auth] Erreur chargement player:', err);
+                  }
+                }
+                break;
+                
+              case 'SIGNED_OUT':
+                setUser(null);
+                setPlayer(null);
+                break;
+                
+              case 'USER_UPDATED':
+                setUser(newUser);
+                break;
+            }
+          }
+        );
+        
+        subscription = sub;
+        
+      } catch (err: any) {
+        console.error('[Auth] Erreur init:', err);
+        clearTimeout(timeoutId);
+        setInitError(err.message || "Erreur d'initialisation");
+        setIsInitializing(false);
       }
     };
 
     initializeAuth();
 
-    // S'abonner aux changements d'état d'authentification
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
-        
-        if (!isActive) return;
-
-        const currentUser = session?.user ?? null;
-        
-        switch (event) {
-          case 'SIGNED_IN':
-          case 'TOKEN_REFRESHED':
-            setUser(currentUser);
-            if (currentUser) {
-              try {
-                const playerData = await getPlayerByUserId(currentUser.id);
-                if (isActive) {
-                  setPlayer(playerData);
-                }
-              } catch (err) {
-                console.error('Erreur lors du chargement du player:', err);
-              }
-            }
-            break;
-            
-          case 'SIGNED_OUT':
-            setUser(null);
-            setPlayer(null);
-            break;
-            
-          case 'USER_UPDATED':
-            setUser(currentUser);
-            break;
-        }
-      }
-    );
-
     return () => {
-      console.log('Cleanup - setting isActive to false');
-      isActive = false;
-      subscription.unsubscribe();
+      clearTimeout(timeoutId);
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
@@ -116,6 +240,7 @@ function AppContent() {
     event.preventDefault();
     setLoading(true);
     setAuthError(null);
+    setInitError(null);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -146,6 +271,7 @@ function AppContent() {
     event.preventDefault();
     setLoading(true);
     setAuthError(null);
+    setInitError(null);
 
     if (!username.trim()) {
       setAuthError("Veuillez choisir un nom d'utilisateur");
@@ -193,6 +319,8 @@ function AppContent() {
       setEmail("");
       setPassword("");
       setUsername("");
+      setAuthError(null);
+      setInitError(null);
     } catch (err) {
       console.error('Erreur lors de la déconnexion:', err);
       setAuthError("Erreur lors de la déconnexion");
@@ -201,31 +329,38 @@ function AppContent() {
     }
   }, []);
 
-  // Écran de chargement initial
+  // Écran de chargement initial (max 3 secondes)
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="text-muted-foreground">Chargement...</p>
+          <p className="text-xs text-muted-foreground">Si cela prend trop de temps, rafraîchissez la page</p>
         </div>
       </div>
     );
   }
 
-  if (authError) {
+  // Afficher les erreurs
+  if (authError || initError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Authentication</CardTitle>
+            <CardTitle>Erreur</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <Alert variant="destructive">
-              <AlertDescription>✗ Erreur : {authError}</AlertDescription>
+              <AlertDescription>
+                {authError || initError}
+              </AlertDescription>
             </Alert>
-            <Button onClick={() => setAuthError(null)} className="w-full">
-              Retour
+            <Button onClick={() => {
+              setAuthError(null);
+              setInitError(null);
+            }} className="w-full">
+              Réessayer
             </Button>
           </CardContent>
         </Card>
@@ -233,6 +368,7 @@ function AppContent() {
     );
   }
 
+  // Formulaire de connexion
   if (!user || !player) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted p-4">
@@ -306,6 +442,7 @@ function AppContent() {
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setAuthError(null);
+                  setInitError(null);
                 }}
               >
                 {isSignUp
@@ -319,53 +456,23 @@ function AppContent() {
     );
   }
 
+  // Application authentifiée
   return (
-    <div className="min-h-screen bg-background">
-      <Header playerName={player.player_name} onLogout={handleLogout} />
-
-      <main>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Home
-                user={user}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route path="/games" element={<Games />} />
-          <Route
-            path="/games/chicken-fight"
-            element={
-              <ChickenFightPage
-                userId={user.id}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route
-            path="/games/roulette"
-            element={
-              <RoulettePage
-                userId={user.id}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </main>
-    </div>
+    <AuthenticatedApp 
+      user={user} 
+      player={player} 
+      setPlayer={setPlayer}
+      handleLogout={handleLogout}
+    />
   );
 }
 
 function App() {
-  return <AppContent />;
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
+  );
 }
 
 export default App;
