@@ -40,6 +40,10 @@ export function Leaderboard() {
         return <Badge className="bg-gray-400 hover:bg-gray-500 text-white">🥈 2ème</Badge>;
       case 2:
         return <Badge className="bg-orange-400 hover:bg-orange-500 text-white">🥉 3ème</Badge>;
+      case 3:
+        return <Badge className="bg-blue-400 hover:bg-blue-500 text-white">4ème</Badge>;
+      case 4:
+        return <Badge className="bg-green-400 hover:bg-green-500 text-white">5ème</Badge>;
       default:
         return <Badge variant="outline">#{index + 1}</Badge>;
     }
@@ -53,6 +57,10 @@ export function Leaderboard() {
         return "bg-gray-50/50";
       case 2:
         return "bg-orange-50/50";
+      case 3:
+        return "bg-blue-50/50";
+      case 4:
+        return "bg-green-50/50";
       default:
         return "";
     }
@@ -124,20 +132,38 @@ export function Leaderboard() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback className="bg-primary text-primary-foreground">
-                            {player.player_name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">
-                          {player.player_name}
-                        </span>
+                        <div className="relative">
+                          <Avatar>
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {player.player_name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {player.is_online && (
+                            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" title="En ligne"></span>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {player.player_name}
+                          </span>
+                          {player.is_online && (
+                            <span className="text-xs text-green-600">En ligne</span>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="text-xl font-bold text-primary">
-                        {player.nb_point.toLocaleString()}
-                      </span>
+                      <div className="flex items-center justify-end gap-2">
+                        {player.nb_share_A > 0 && (
+                          <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50">{player.nb_share_A} GCC</Badge>
+                        )}
+                        {player.nb_share_B > 0 && (
+                          <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 bg-purple-50">{player.nb_share_B} GC</Badge>
+                        )}
+                        <span className="text-xl font-bold text-primary">
+                          {player.nb_point.toLocaleString()}
+                        </span>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -28,6 +28,14 @@ const games: Game[] = [
     icon: "🍀",
     path: "/games/roulette",
     color: "bg-red-500",
+  },
+  {
+    id: "slot-machine",
+    name: "Machine à Sous",
+    description: "Faites tourner les rouleaux et tentez de gagner gros ! Alignez 3, 4 ou 5 numéros identiques.",
+    icon: "🎰",
+    path: "/games/slot-machine",
+    color: "bg-purple-500",
   }
 ];
 
@@ -41,22 +49,22 @@ export function Games() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {games.map((game) => (
-          <Link key={game.id} to={game.path} className="block">
-            <Card className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105">
-              <div className={`${game.color} h-32 flex items-center justify-center`}>
+          <Link key={game.id} to={game.path} className="block h-full">
+            <Card className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:scale-105 h-full flex flex-col">
+              <div className={`${game.color} h-32 flex items-center justify-center flex-shrink-0`}>
                 <span className="text-6xl transition-transform duration-300 group-hover:scale-110">
                   {game.icon}
                 </span>
               </div>
-              <CardHeader>
+              <CardHeader className="flex-grow">
                 <CardTitle className="group-hover:text-primary transition-colors">
                   {game.name}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="line-clamp-3">
                   {game.description}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-shrink-0">
                 <Button variant="link" className="p-0 h-auto font-semibold group/btn">
                   Jouer maintenant
                   <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
