@@ -21,7 +21,7 @@ function getVariationForSecond(timestamp: number, shareType: 'A' | 'B'): number 
   const salt = shareType === 'A' ? 0 : 999999;
   const rng = seededRandom(timestamp + salt);
 
-  const factor = shareType === 'A' ? 0.01 : 0.015;
+  const factor = shareType === 'A' ? 0.012 : 0.015;
 
   // Variation dépendente du type d'action
   return (rng() - 0.5) * factor;

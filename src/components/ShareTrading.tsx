@@ -59,14 +59,20 @@ export function ShareTrading({
     return () => clearInterval(interval);
   }, [snapshot, player]);
 
+  const FEE_RATE = 0.05; // 5% de frais sur les achats
+
   const handleBuy = (shareType: 'A' | 'B') => {
     const qty = shareType === 'A' ? buyQty.A : buyQty.B;
-    
+
     // Toujours utiliser les prix actuels calculés à partir du snapshot
     const currentPrices = getCurrentPrices(snapshot);
-    const cost = calculateBuyCost(snapshot, shareType, qty);
+    const baseCost = calculateBuyCost(snapshot, shareType, qty);
+    const fee = baseCost * FEE_RATE;
+    const cost = baseCost + fee;
 
-    // Permettre d'acheter même avec des fonds insuffisants (création de dette)
+    // Bloquer l'achat si fonds insuffisants
+    if (cost > player.nb_point) return;
+
     const newPoints = player.nb_point - cost;
     const currentQty = shareType === 'A' ? player.nb_share_A : player.nb_share_B;
     const currentAvg = shareType === 'A' ? player.avg_share_A_value : player.avg_share_B_value;
@@ -248,67 +254,91 @@ export function ShareTrading({
           </TabsList>
 
           <TabsContent value="buy" className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Des frais de 5% s'appliquent sur chaque achat.
+            </p>
+
             {/* Achat GoGoCoin */}
-            <div className="p-4 border rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold">GoGoCoin</span>
-                <span className="text-sm text-muted-foreground">
-                  Coût: {(buyQty.A * prices.priceA).toFixed(2)} pts
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={buyQty.A}
-                  onChange={(e) => setBuyQty({ ...buyQty, A: parseInt(e.target.value) || 0 })}
-                  className="w-20"
-                />
-                <Button
-                  onClick={() => handleBuy('A')}
-                  className="flex-1"
-                  variant={player.nb_point < buyQty.A * prices.priceA ? "destructive" : "default"}
-                >
-                  Acheter {buyQty.A} GoGoCoin(s)
-                </Button>
-              </div>
-              {player.nb_point < buyQty.A * prices.priceA && (
-                <p className="text-xs text-red-500 mt-1">
-                  Fonds insuffisants - Dette de {(buyQty.A * prices.priceA - player.nb_point).toFixed(2)} pts
-                </p>
-              )}
-            </div>
+            {(() => {
+              const baseCostA = buyQty.A * prices.priceA;
+              const totalCostA = baseCostA * (1 + FEE_RATE);
+              const canAffordA = player.nb_point >= totalCostA && buyQty.A > 0;
+              return (
+                <div className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold">GoGoCoin</span>
+                    <div className="text-right text-sm">
+                      <span className="text-muted-foreground">
+                        {baseCostA.toFixed(2)} + {(baseCostA * FEE_RATE).toFixed(2)} frais ={" "}
+                      </span>
+                      <span className="font-semibold">{totalCostA.toFixed(2)} pts</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={buyQty.A}
+                      onChange={(e) => setBuyQty({ ...buyQty, A: parseInt(e.target.value) || 0 })}
+                      className="w-20"
+                    />
+                    <Button
+                      onClick={() => handleBuy('A')}
+                      className="flex-1"
+                      disabled={!canAffordA}
+                    >
+                      Acheter {buyQty.A} GoGoCoin(s)
+                    </Button>
+                  </div>
+                  {!canAffordA && buyQty.A > 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Fonds insuffisants (il vous manque {(totalCostA - player.nb_point).toFixed(2)} pts)
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Achat GamblingCoin */}
-            <div className="p-4 border rounded-lg">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold">GamblingCoin</span>
-                <span className="text-sm text-muted-foreground">
-                  Coût: {(buyQty.B * prices.priceB).toFixed(2)} pts
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  min={1}
-                  value={buyQty.B}
-                  onChange={(e) => setBuyQty({ ...buyQty, B: parseInt(e.target.value) || 0 })}
-                  className="w-20"
-                />
-                <Button
-                  onClick={() => handleBuy('B')}
-                  className="flex-1"
-                  variant={player.nb_point < buyQty.B * prices.priceB ? "destructive" : "default"}
-                >
-                  Acheter {buyQty.B} GamblingCoin(s)
-                </Button>
-              </div>
-              {player.nb_point < buyQty.B * prices.priceB && (
-                <p className="text-xs text-red-500 mt-1">
-                  Fonds insuffisants - Dette de {(buyQty.B * prices.priceB - player.nb_point).toFixed(2)} pts
-                </p>
-              )}
-            </div>
+            {(() => {
+              const baseCostB = buyQty.B * prices.priceB;
+              const totalCostB = baseCostB * (1 + FEE_RATE);
+              const canAffordB = player.nb_point >= totalCostB && buyQty.B > 0;
+              return (
+                <div className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-semibold">GamblingCoin</span>
+                    <div className="text-right text-sm">
+                      <span className="text-muted-foreground">
+                        {baseCostB.toFixed(2)} + {(baseCostB * FEE_RATE).toFixed(2)} frais ={" "}
+                      </span>
+                      <span className="font-semibold">{totalCostB.toFixed(2)} pts</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={buyQty.B}
+                      onChange={(e) => setBuyQty({ ...buyQty, B: parseInt(e.target.value) || 0 })}
+                      className="w-20"
+                    />
+                    <Button
+                      onClick={() => handleBuy('B')}
+                      className="flex-1"
+                      disabled={!canAffordB}
+                    >
+                      Acheter {buyQty.B} GamblingCoin(s)
+                    </Button>
+                  </div>
+                  {!canAffordB && buyQty.B > 0 && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Fonds insuffisants (il vous manque {(totalCostB - player.nb_point).toFixed(2)} pts)
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="sell" className="space-y-4">
