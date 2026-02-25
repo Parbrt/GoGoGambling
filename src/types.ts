@@ -9,4 +9,6 @@ export type PlayerType = {
   avg_share_B_value: number
   user_id: string
   last_login: string | null
+  last_daily_reward_claim: string | null
+  is_online?: boolean
 }
