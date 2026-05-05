@@ -1,12 +1,6 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: server/Dockerfile
-      args:
-        SUPABASE_URL: ${VITE_SUPABASE_URL}
-        SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+    image: ghcr.io/parbrt/gogogambling-backend:latest
     restart: unless-stopped
     volumes:
       - gogo_data:/data
@@ -20,7 +14,7 @@ services:
       - PORT=3001
 
   gogogambling:
-    image: ghcr.io/nexgear75/gogogambling:latest
+    image: ghcr.io/parbrt/gogogambling:latest
     restart: unless-stopped
     networks:
       - web
