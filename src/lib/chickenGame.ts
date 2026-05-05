@@ -34,7 +34,7 @@ export interface FightResult {
 }
 
 export function fight(chickenA: Chicken, chickenB: Chicken): FightResult {
-  let statA = randint(0, 4);
+  const statA = randint(0, 4);
   let statB = statA;
   while (statB === statA) {
     statB = randint(0, 4);
