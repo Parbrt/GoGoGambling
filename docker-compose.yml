@@ -1,0 +1,16 @@
+services:
+  gogogambling:
+    image: ghcr.io/nexgear75/gogogambling:latest
+    restart: unless-stopped
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gogogambling.rule=Host(`gogo.alexfougeroux.me`)"
+      - "traefik.http.routers.gogogambling.entrypoints=websecure"
+      - "traefik.http.routers.gogogambling.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gogogambling.loadbalancer.server.port=80"
+
+networks:
+  web:
+    external: true
