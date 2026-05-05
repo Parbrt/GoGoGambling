@@ -1,121 +1,88 @@
 import "./index.css";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { Home } from "@/pages/Home";
+import { Trading } from "@/pages/Trading";
 import { Games } from "@/pages/Games";
 import { Leaderboard } from "@/pages/Leaderboard";
 import { ChickenFightPage } from "@/pages/ChickenFightPage";
 import { RoulettePage } from "@/pages/RoulettePage";
 import { SlotMachinePage } from "@/pages/SlotMachinePage";
+import { BlackjackPage } from "@/pages/BlackjackPage";
 import { Profile } from "@/pages/Profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
-import { supabase, checkUsernameExists, createPlayer, getPlayerByUserId, updateLastLogin, setPlayerOnline } from '@/lib/supabase'
-import type { User } from '@supabase/supabase-js';
-import type { PlayerType } from '@/types';
+import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import type { User } from "@supabase/supabase-js";
+import type { PlayerType } from "@/types";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
 
-// Timeout pour l'initialisation (3 secondes max)
 const INIT_TIMEOUT = 3000;
 
-function AuthenticatedApp({ user, player, setPlayer, handleLogout }: { 
-  user: User; 
-  player: PlayerType; 
+function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
+  user: User;
+  player: PlayerType;
   setPlayer: (p: PlayerType) => void;
   handleLogout: () => void;
 }) {
-  // Active les notifications automatiques
   useAutoNotifications({ currentUserId: user.id, currentPlayer: player });
   useGlobalNotifications({ currentUserId: user.id });
 
-  // Gérer le statut en ligne
   useEffect(() => {
-    // Marquer comme en ligne au chargement
-    setPlayerOnline(user.id, true).catch(console.error);
+    api.player.setOnline().catch(console.error);
 
-    // Marquer comme hors ligne à la fermeture
+    const heartbeatId = setInterval(() => {
+      api.player.heartbeat().catch(() => {});
+    }, 30000);
+
     const handleBeforeUnload = () => {
-      setPlayerOnline(user.id, false);
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token;
+        if (token) {
+          fetch(`${baseUrl}/api/player/offline`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            keepalive: true,
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
+    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      setPlayerOnline(user.id, false).catch(console.error);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      clearInterval(heartbeatId);
+      api.player.setOffline().catch(() => {});
     };
   }, [user.id]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <NotificationContainer />
       <Header playerName={player.player_name} onLogout={handleLogout} />
-
-      <main>
+      <main className="flex-1">
         <Routes>
-          <Route
-            path="/"
-            element={
-              <Home
-                user={user}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
+          <Route path="/" element={<Home user={user} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/trading" element={<Trading player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/games" element={<Games />} />
-          <Route
-            path="/games/chicken-fight"
-            element={
-              <ChickenFightPage
-                userId={user.id}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route
-            path="/games/roulette"
-            element={
-              <RoulettePage
-                userId={user.id}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route
-            path="/games/slot-machine"
-            element={
-              <SlotMachinePage
-                userId={user.id}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <Profile
-                user={user}
-                player={player}
-                onPlayerUpdate={setPlayer}
-              />
-            }
-          />
+          <Route path="/games/chicken-fight" element={<ChickenFightPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/games/roulette" element={<RoulettePage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/games/slot-machine" element={<SlotMachinePage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/games/blackjack" element={<BlackjackPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/profile" element={<Profile user={user} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <Footer />
     </div>
   );
 }
@@ -131,108 +98,79 @@ function AppContent() {
   const [player, setPlayer] = useState<PlayerType | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
-  
-  // Ref pour éviter les initialisations multiples
-  const hasInitialized = useRef(false);
-
-  // Initialisation de l'authentification
   useEffect(() => {
-    // Éviter les exécutions multiples
-    if (hasInitialized.current) return;
-    hasInitialized.current = true;
-
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let cancelled = false;
     let subscription: { unsubscribe: () => void } | null = null;
+
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      setInitError("Impossible de verifier la session. Veuillez vous connecter.");
+      setIsInitializing(false);
+    }, INIT_TIMEOUT);
 
     const initializeAuth = async () => {
       try {
-        console.log('[Auth] Initialisation...');
-        
-        // Timeout de sécurité
-        timeoutId = setTimeout(() => {
-          console.warn('[Auth] Timeout - affichage du formulaire de connexion');
-          setInitError("Impossible de vérifier la session. Veuillez vous connecter.");
-          setIsInitializing(false);
-        }, INIT_TIMEOUT);
-
-        // Récupérer la session actuelle
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('[Auth] Erreur session:', sessionError);
-          throw sessionError;
-        }
+        if (cancelled) return;
+        if (sessionError) throw sessionError;
 
         const currentUser = session?.user ?? null;
-        console.log('[Auth] Session:', currentUser ? `User ${currentUser.id}` : 'Aucune');
-
         setUser(currentUser);
 
         if (currentUser) {
           try {
-            const playerData = await getPlayerByUserId(currentUser.id);
-            console.log('[Auth] Player chargé:', playerData ? playerData.player_name : 'null');
-            setPlayer(playerData);
-          } catch (err) {
-            console.error('[Auth] Erreur chargement player:', err);
-            // On continue même sans player - l'utilisateur devra compléter son profil
+            const playerData = await api.player.me();
+            if (!cancelled) setPlayer(playerData);
+          } catch {
+            if (!cancelled) setInitError("Impossible de charger votre profil. Verifiez votre connexion et reessayez.");
           }
         }
 
-        // Annuler le timeout si tout s'est bien passé
+        if (cancelled) return;
         clearTimeout(timeoutId);
         setIsInitializing(false);
-        
-        // S'abonner aux changements d'état
+
         const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(
           async (event, newSession) => {
-            console.log('[Auth] Événement:', event);
-            
+            if (cancelled) return;
             const newUser = newSession?.user ?? null;
-            
             switch (event) {
-              case 'SIGNED_IN':
-              case 'TOKEN_REFRESHED':
+              case "SIGNED_IN":
+              case "TOKEN_REFRESHED":
                 setUser(newUser);
                 if (newUser) {
                   try {
-                    const playerData = await getPlayerByUserId(newUser.id);
-                    setPlayer(playerData);
-                  } catch (err) {
-                    console.error('[Auth] Erreur chargement player:', err);
+                    const playerData = await api.player.me();
+                    if (!cancelled) setPlayer(playerData);
+                  } catch {
+                    if (!cancelled) setInitError("Impossible de charger votre profil. Verifiez votre connexion.");
                   }
                 }
                 break;
-                
-              case 'SIGNED_OUT':
+              case "SIGNED_OUT":
                 setUser(null);
                 setPlayer(null);
                 break;
-                
-              case 'USER_UPDATED':
+              case "USER_UPDATED":
                 setUser(newUser);
                 break;
             }
           }
         );
-        
         subscription = sub;
-        
-      } catch (err: any) {
-        console.error('[Auth] Erreur init:', err);
+      } catch (err: unknown) {
+        if (cancelled) return;
         clearTimeout(timeoutId);
-        setInitError(err.message || "Erreur d'initialisation");
+        setInitError(err instanceof Error ? err.message : "Erreur d'initialisation");
         setIsInitializing(false);
       }
     };
 
     initializeAuth();
-
     return () => {
+      cancelled = true;
       clearTimeout(timeoutId);
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      if (subscription) subscription.unsubscribe();
     };
   }, []);
 
@@ -241,27 +179,27 @@ function AppContent() {
     setLoading(true);
     setAuthError(null);
     setInitError(null);
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         setAuthError(error.message);
-      } else if (data.user) {
-        setUser(data.user);
-        try {
-          await updateLastLogin(data.user.id);
-          const playerData = await getPlayerByUserId(data.user.id);
-          setPlayer(playerData);
-        } catch (err) {
-          console.error('Erreur lors du chargement du player:', err);
-        }
+        setLoading(false);
+        return;
       }
-    } catch (err: any) {
-      setAuthError(err.message || "Erreur de connexion");
+      if (!data.user) {
+        setAuthError("Erreur de connexion inattendue.");
+        setLoading(false);
+        return;
+      }
+      try {
+        const playerData = await api.player.me();
+        setUser(data.user);
+        setPlayer(playerData);
+      } catch {
+        setAuthError("Impossible de charger votre profil. Verifiez votre connexion et reessayez.");
+      }
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : "Erreur de connexion");
     } finally {
       setLoading(false);
     }
@@ -272,39 +210,56 @@ function AppContent() {
     setLoading(true);
     setAuthError(null);
     setInitError(null);
-
     if (!username.trim()) {
       setAuthError("Veuillez choisir un nom d'utilisateur");
       setLoading(false);
       return;
     }
-
     try {
-      const exists = await checkUsernameExists(username);
+      const { exists } = await api.player.checkUsername(username);
       if (exists) {
-        setAuthError("Ce nom d'utilisateur est déjà pris !");
+        setAuthError("Ce nom d'utilisateur est deja pris !");
         setLoading(false);
         return;
       }
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
-        setAuthError(error.message);
-      } else if (data.user) {
+        if (error.message.includes("already") || error.message.includes("already registered")) {
+          setAuthError("Cet email est deja utilise. Connectez-vous ou utilisez un autre email.");
+        } else {
+          setAuthError(error.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        // Always create the player record even without a session (email confirmation)
         try {
-          const newPlayer = await createPlayer(data.user.id, username);
-          setPlayer(newPlayer);
-          setUser(data.user);
-        } catch (err: any) {
-          setAuthError("Compte créé mais erreur lors de la création du profil: " + err.message);
+          await api.player.create(data.user.id, username);
+        } catch (err: unknown) {
+          console.error("[SignUp] Erreur create player:", err);
+        }
+
+        if (data.session) {
+          // Auto-confirmed: log in immediately
+          try {
+            const playerData = await api.player.me();
+            setUser(data.user);
+            setPlayer(playerData);
+          } catch {
+            setAuthError("Compte cree, mais impossible de charger votre profil. Essayez de vous connecter.");
+            setUser(data.user);
+          }
+        } else {
+          // Email confirmation required
+          setAuthError(
+            "Compte cree ! Verifiez votre boite email pour confirmer votre adresse, puis connectez-vous."
+          );
+          setIsSignUp(false);
         }
       }
-    } catch (err: any) {
-      setAuthError(err.message || "Erreur d'inscription");
+    } catch (err: unknown) {
+      setAuthError(err instanceof Error ? err.message : "Erreur d'inscription");
     } finally {
       setLoading(false);
     }
@@ -313,6 +268,7 @@ function AppContent() {
   const handleLogout = useCallback(async () => {
     try {
       setLoading(true);
+      await api.player.setOffline().catch(() => {});
       await supabase.auth.signOut();
       setUser(null);
       setPlayer(null);
@@ -322,68 +278,60 @@ function AppContent() {
       setAuthError(null);
       setInitError(null);
     } catch (err) {
-      console.error('Erreur lors de la déconnexion:', err);
-      setAuthError("Erreur lors de la déconnexion");
+      console.error("Erreur lors de la deconnexion:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Écran de chargement initial (max 3 secondes)
   if (isInitializing) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F0EE]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">Chargement...</p>
-          <p className="text-xs text-muted-foreground">Si cela prend trop de temps, rafraîchissez la page</p>
+          <Loader2 className="h-10 w-10 animate-spin text-[#141413]" />
+          <p className="text-[#696969] font-medium">Chargement...</p>
         </div>
       </div>
     );
   }
 
-  // Afficher les erreurs
-  if (authError || initError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Erreur</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert variant="destructive">
-              <AlertDescription>
-                {authError || initError}
-              </AlertDescription>
-            </Alert>
-            <Button onClick={() => {
-              setAuthError(null);
-              setInitError(null);
-            }} className="w-full">
-              Réessayer
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Formulaire de connexion
   if (!user || !player) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl">GoGoGambling</CardTitle>
-            <CardDescription>
-              {isSignUp ? "Créer un compte" : "Connexion"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F0EE] p-6 relative overflow-hidden">
+        <div
+          aria-hidden
+          className="ghost-headline absolute -top-4 left-0 right-0 text-center text-[140px] md:text-[220px] select-none"
+        >
+          welcome.
+        </div>
+        <div className="w-full max-w-sm relative">
+          <div className="text-center mb-10">
+            <span className="eyebrow inline-flex justify-center mb-3">
+              {isSignUp ? "Inscription" : "Connexion"}
+            </span>
+            <h1 className="text-5xl font-medium tracking-[-0.03em] text-[#141413] leading-[1.02] mb-2">
+              GoGoGambling
+            </h1>
+            <p className="text-[#696969]">
+              {isSignUp
+                ? "Creez votre compte en quelques secondes."
+                : "Heureux de vous revoir."}
+            </p>
+          </div>
+
+          <div className="bg-[#FCFBFA] rounded-[40px] border border-[#D1CDC7] p-8 shadow-[rgba(0,0,0,0.04)_0px_4px_24px_0px]">
+            {(authError || initError) && (
+              <div className="mb-6 p-4 bg-[#CF4500]/8 border border-[#CF4500]/20 rounded-[20px]">
+                <p className="text-sm text-[#CF4500] font-medium">{authError || initError}</p>
+              </div>
+            )}
+
             <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="username">Nom d'utilisateur</Label>
+                  <Label htmlFor="username" className="text-sm font-medium text-[#141413]">
+                    Nom d'utilisateur
+                  </Label>
                   <Input
                     id="username"
                     type="text"
@@ -396,7 +344,9 @@ function AppContent() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-[#141413]">
+                  Email
+                </Label>
                 <Input
                   id="email"
                   type="email"
@@ -408,59 +358,56 @@ function AppContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-[#141413]">
+                  Mot de passe
+                </Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="········"
                   value={password}
                   required
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full"
-              >
+              <Button type="submit" disabled={loading} className="w-full mt-2">
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Chargement...
                   </>
                 ) : (
-                  isSignUp ? "Créer un compte" : "Se connecter"
+                  isSignUp ? "Creer un compte" : "Se connecter"
                 )}
               </Button>
             </form>
 
-            <div className="mt-4 text-center">
-              <Button
+            <div className="mt-6 text-center">
+              <button
                 type="button"
-                variant="link"
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setAuthError(null);
                   setInitError(null);
                 }}
+                className="text-sm text-[#696969] hover:text-[#141413] transition-colors font-medium"
               >
                 {isSignUp
-                  ? "Déjà un compte ? Se connecter"
-                  : "Pas de compte ? Créer un compte"}
-              </Button>
+                  ? "Deja un compte ? Se connecter"
+                  : "Pas de compte ? Creer un compte"}
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Application authentifiée
   return (
-    <AuthenticatedApp 
-      user={user} 
-      player={player} 
+    <AuthenticatedApp
+      user={user}
+      player={player}
       setPlayer={setPlayer}
       handleLogout={handleLogout}
     />
