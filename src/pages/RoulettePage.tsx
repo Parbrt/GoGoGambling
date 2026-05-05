@@ -14,16 +14,14 @@ export function RoulettePage({ userId, player, onPlayerUpdate }: RoulettePagePro
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">🎰 Roulette</h1>
         <p className="text-muted-foreground">
-          Tentez votre chance à la roulette et gagnez gros !
+          Tentez votre chance a la roulette et gagnez gros !
         </p>
       </div>
 
       <Roulette
         userId={userId}
         currentPoints={player.nb_point}
-        onPointsUpdate={(newPoints) => {
-          onPlayerUpdate({ ...player, nb_point: newPoints });
-        }}
+        onPointsUpdate={(newPoints) => onPlayerUpdate({ ...player, nb_point: newPoints })}
       />
 
       <Card className="bg-primary/5 border-primary/20">
@@ -32,9 +30,9 @@ export function RoulettePage({ userId, player, onPlayerUpdate }: RoulettePagePro
         </CardHeader>
         <CardContent>
           <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
-            <li><strong>Impair/Pair (x2):</strong> Pariez sur la parité du numéro gagnant</li>
-            <li><strong>Numéro (x36):</strong> Pariez sur un numéro spécifique entre 0 et 35</li>
-            <li>Si vous gagnez, vous remportez votre mise multipliée par le coefficient !</li>
+            <li><strong>Impair/Pair (x2):</strong> Pariez sur la parite du numero gagnant</li>
+            <li><strong>Numero (x36):</strong> Pariez sur un numero specifique entre 0 et 35</li>
+            <li>Si vous gagnez, vous remportez votre mise multipliee par le coefficient !</li>
           </ul>
         </CardContent>
       </Card>

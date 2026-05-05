@@ -21,9 +21,7 @@ export function ChickenFightPage({ userId, player, onPlayerUpdate }: ChickenFigh
       <ChickenFight
         userId={userId}
         currentPoints={player.nb_point}
-        onPointsUpdate={(newPoints) => {
-          onPlayerUpdate({ ...player, nb_point: newPoints });
-        }}
+        onPointsUpdate={(newPoints) => onPlayerUpdate({ ...player, nb_point: newPoints })}
       />
 
       <Card className="bg-primary/5 border-primary/20">
@@ -33,9 +31,9 @@ export function ChickenFightPage({ userId, player, onPlayerUpdate }: ChickenFigh
         <CardContent>
           <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
             <li>Analysez les statistiques de chaque poulet</li>
-            <li>Sélectionnez celui que vous pensez être le plus fort</li>
+            <li>Selectionnez celui que vous pensez etre le plus fort</li>
             <li>Choisissez votre mise</li>
-            <li>La cote est calculée en fonction des mises totales</li>
+            <li>La cote est calculee en fonction des mises totales</li>
             <li>Si vous gagnez, vous remportez votre mise × la cote !</li>
           </ul>
         </CardContent>

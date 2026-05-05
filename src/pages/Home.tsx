@@ -1,24 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { DailyReward } from "@/components/DailyReward";
-import { ShareTrading } from "@/components/ShareTrading";
 import { ShareChart } from "@/components/ShareChart";
 import type { PlayerType } from "@/types";
 import type { User } from "@supabase/supabase-js";
-import type { ShareSnapshot } from "@/lib/shareLogic";
-import {
-  getCurrentPrices,
-  calculateTotalPortfolioValue,
-  createInitialSnapshot,
-} from "@/lib/shareLogic";
-import {
-  getLatestShare,
-  getShareHistory,
-  insertShare,
-  updateLatestSnapshot,
-  updatePlayerShares,
-  type ShareData,
-} from "@/lib/supabase";
+import { api } from "@/lib/api";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { generateMockHistory } from "@/lib/shareLogic";
 
 interface HomeProps {
   user: User;
@@ -26,301 +13,217 @@ interface HomeProps {
   onPlayerUpdate: (player: PlayerType) => void;
 }
 
-export function Home({ user, player, onPlayerUpdate }: HomeProps) {
-  // État pour le snapshot des actions
-  const [snapshot, setSnapshot] = useState<ShareSnapshot | null>(null);
-  const [shareHistory, setShareHistory] = useState<ShareData[]>([]);
+interface HistoryPoint {
+  value_share_A: number;
+  value_share_B: number;
+  time_update: string;
+}
+
+type StatTone = "ink" | "alert" | "link";
+
+function Stat({ label, value, tone }: { label: string; value: string; tone: StatTone }) {
+  const color =
+    tone === "alert" ? "text-[#CF4500]" :
+    tone === "link" ? "text-[#3860BE]" :
+    "text-[#141413]";
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">
+        {label}
+      </p>
+      <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${color}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function calculateTotalPortfolioValue(
+  priceA: number,
+  priceB: number,
+  nbShareA: number,
+  avgShareA: number,
+  nbShareB: number,
+  avgShareB: number
+) {
+  const profitA = nbShareA > 0 ? (priceA - avgShareA) * nbShareA : 0;
+  const profitB = nbShareB > 0 ? (priceB - avgShareB) * nbShareB : 0;
+  const totalValue = nbShareA * priceA + nbShareB * priceB;
+  return {
+    profitA, profitB,
+    totalProfit: profitA + profitB,
+    totalValue,
+  };
+}
+
+export function Home({ player, onPlayerUpdate }: HomeProps) {
+  const [prices, setPrices] = useState({ priceA: 2000, priceB: 400 });
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [prices, setPrices] = useState(() => snapshot ? getCurrentPrices(snapshot) : { priceA: 0, priceB: 0 });
   const [portfolio, setPortfolio] = useState({
-    profitA: 0,
-    profitB: 0,
-    totalProfit: 0,
-    totalValue: 0,
+    profitA: 0, profitB: 0, totalProfit: 0, totalValue: 0,
   });
 
-  // Charger les données depuis Supabase au montage
+  // WebSocket for real-time prices
+  useWebSocket({
+    onPriceUpdate: useCallback((data: { priceA: number; priceB: number }) => {
+      setPrices({ priceA: data.priceA, priceB: data.priceB });
+    }, []),
+  });
+
+  // Load history on mount + poll current prices
   useEffect(() => {
-    const loadShareData = async () => {
+    let cancelled = false;
+    const load = async () => {
       try {
-        // Récupérer le dernier snapshot
-        const latestShare = await getLatestShare();
+        const [currentPrices, shareHistory] = await Promise.all([
+          api.shares.current(),
+          api.shares.history(50),
+        ]);
+        if (cancelled) return;
+        setPrices({ priceA: currentPrices.priceA, priceB: currentPrices.priceB });
 
-        if (latestShare) {
-          const newSnapshot: ShareSnapshot = {
-            value_share_A: Number(latestShare.value_share_A) || 150,
-            value_share_B: Number(latestShare.value_share_B) || 45,
-            time_now: Math.floor(new Date(latestShare.time_now || Date.now()).getTime() / 1000),
-          };
-          setSnapshot(newSnapshot);
+        if (shareHistory.length > 0) {
+          setHistory(shareHistory.map(s => ({
+            value_share_A: s.value_share_A,
+            value_share_B: s.value_share_B,
+            time_update: s.time_update,
+          })));
         } else {
-          // Créer un snapshot initial si aucun n'existe
-          const initialSnapshot = createInitialSnapshot();
-          setSnapshot(initialSnapshot);
-
-          // L'insérer dans la base de données
-          await insertShare({
-            value_share_A: initialSnapshot.value_share_A,
-            value_share_B: initialSnapshot.value_share_B,
-            time_update: new Date().toISOString(),
-            time_now: new Date().toISOString(),
-          });
+          const mock = generateMockHistory(currentPrices);
+          setHistory(mock);
         }
-
-        // Récupérer l'historique pour le graphique
-        let history = await getShareHistory(50);
-        
-        // Si l'historique est vide, générer des données historiques factices
-        if (history.length === 0) {
-          const now = new Date();
-          const basePriceA = latestShare ? latestShare.value_share_A : 150;
-          const basePriceB = latestShare ? latestShare.value_share_B : 45;
-          
-          // Générer 50 points de données historiques
-          const mockHistory: ShareData[] = [];
-          for (let i = 50; i >= 0; i--) {
-            const time = new Date(now.getTime() - i * 60000); // -i minutes
-            mockHistory.push({
-              value_share_A: basePriceA + (Math.random() - 0.5) * 10,
-              value_share_B: basePriceB + (Math.random() - 0.5) * 5,
-              time_update: time.toISOString(),
-              time_now: time.toISOString(),
-            });
-          }
-          history = mockHistory;
-        }
-        
-        setShareHistory(history);
-      } catch (error) {
-        console.error("[Home] Erreur lors du chargement des données:", error);
-        // Fallback sur un snapshot local
-        setSnapshot(createInitialSnapshot());
+      } catch (err) {
+        if (cancelled) return;
+        console.error("[Home] Erreur chargement:", err);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
-
-    loadShareData();
+    load();
+    return () => { cancelled = true; };
   }, []);
 
-  // Mettre à jour les prix en temps réel
+  // Update portfolio when prices or player changes
   useEffect(() => {
-    if (!snapshot) return;
+    const port = calculateTotalPortfolioValue(
+      prices.priceA, prices.priceB,
+      player.nb_share_A, player.avg_share_A_value,
+      player.nb_share_B, player.avg_share_B_value
+    );
+    setPortfolio(port);
 
-    const updatePrices = () => {
-      const current = getCurrentPrices(snapshot);
-      setPrices(current);
-
-      const port = calculateTotalPortfolioValue(
-        snapshot,
-        player.nb_share_A,
-        player.avg_share_A_value,
-        player.nb_share_B,
-        player.avg_share_B_value
-      );
-      setPortfolio(port);
-
-      // Mettre à jour l'historique avec le prix en temps réel
-      setShareHistory((prev) => {
-        const now = new Date();
-        const newPoint: ShareData = {
-          value_share_A: current.priceA,
-          value_share_B: current.priceB,
-          time_update: now.toISOString(),
-          time_now: now.toISOString(),
-        };
-        
-        // Garder seulement les 50 derniers points + le nouveau
-        const updated = [...prev.slice(-49), newPoint];
-        return updated;
-      });
-    };
-
-    updatePrices();
-    const interval = setInterval(updatePrices, 1000);
-    return () => clearInterval(interval);
-  }, [snapshot, player]);
-
-  // Snapshot périodique toutes les 10s : met à jour la dernière ligne en DB.
-  // Les prix étant déterministes (seeded RNG), tous les clients calculent les mêmes valeurs,
-  // donc même si plusieurs clients écrivent en parallèle, les valeurs sont identiques.
-  useEffect(() => {
-    if (!snapshot) return;
-
-    const saveSnapshot = async () => {
-      const current = getCurrentPrices(snapshot);
+    // Append new point to history
+    setHistory(prev => {
       const now = new Date();
-      const updated = await updateLatestSnapshot({
-        value_share_A: current.priceA,
-        value_share_B: current.priceB,
+      const newPoint: HistoryPoint = {
+        value_share_A: prices.priceA,
+        value_share_B: prices.priceB,
         time_update: now.toISOString(),
-        time_now: now.toISOString(),
-      });
+      };
+      return [...prev.slice(-49), newPoint];
+    });
+  }, [prices, player]);
 
-      if (updated) {
-        setSnapshot({
-          value_share_A: current.priceA,
-          value_share_B: current.priceB,
-          time_now: Math.floor(now.getTime() / 1000),
-        });
-      }
-    };
-
-    const interval = setInterval(saveSnapshot, 10_000);
-    return () => clearInterval(interval);
-  }, [snapshot]);
-
-  // Synchroniser avec Supabase lors des transactions
-  const handleSnapshotUpdate = async (newSnapshot: ShareSnapshot) => {
-    // Protection : ne jamais écrire des prix à 0, NaN ou négatifs
-    if (!newSnapshot.value_share_A || !isFinite(newSnapshot.value_share_A) || newSnapshot.value_share_A <= 0) {
-      newSnapshot.value_share_A = snapshot?.value_share_A || 150;
-    }
-    if (!newSnapshot.value_share_B || !isFinite(newSnapshot.value_share_B) || newSnapshot.value_share_B <= 0) {
-      newSnapshot.value_share_B = snapshot?.value_share_B || 45.5;
-    }
-
-    setSnapshot(newSnapshot);
-
-    try {
-      // Insérer le nouveau snapshot dans la base de données
-      await insertShare({
-        value_share_A: newSnapshot.value_share_A,
-        value_share_B: newSnapshot.value_share_B,
-        time_update: new Date().toISOString(),
-        time_now: new Date(newSnapshot.time_now * 1000).toISOString(),
-      });
-
-      // Rafraîchir l'historique
-      const history = await getShareHistory(50);
-      setShareHistory(history);
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour:", error);
-    }
-  };
-
-  const handlePlayerUpdate = async (updatedPlayer: PlayerType) => {
-    try {
-      // Mettre à jour le player dans Supabase
-      await updatePlayerShares(user.id, {
-        nb_point: updatedPlayer.nb_point,
-        nb_debt: updatedPlayer.nb_debt,
-        nb_share_A: updatedPlayer.nb_share_A,
-        avg_share_A_value: updatedPlayer.avg_share_A_value,
-        nb_share_B: updatedPlayer.nb_share_B,
-        avg_share_B_value: updatedPlayer.avg_share_B_value,
-      });
-
-      // Mettre à jour l'état local immédiatement
-      onPlayerUpdate(updatedPlayer);
-      
-      // Forcer le recalcul immédiat du portfolio
-      if (snapshot) {
-        const port = calculateTotalPortfolioValue(
-          snapshot,
-          updatedPlayer.nb_share_A,
-          updatedPlayer.avg_share_A_value,
-          updatedPlayer.nb_share_B,
-          updatedPlayer.avg_share_B_value
-        );
-        setPortfolio(port);
-      }
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du player:", error);
-    }
-  };
-
-  // Calculer la valeur totale (points + actions) - réactif
   const totalValue = useMemo(() => player.nb_point + portfolio.totalValue, [player.nb_point, portfolio.totalValue]);
   const netWorth = useMemo(() => totalValue - player.nb_debt, [totalValue, player.nb_debt]);
 
-  if (isLoading || !snapshot) {
+  if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="max-w-4xl mx-auto px-6 py-24">
+        <div className="flex justify-center items-center h-48">
+          <div className="w-10 h-10 rounded-full border-2 border-[#141413] border-t-transparent animate-spin" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      {/* Résumé financier */}
-      <Card className={netWorth >= 0 ? "bg-green-50" : "bg-red-50"}>
-        <CardHeader>
-          <CardTitle>Résumé financier</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Points</p>
-              <p
-                className={`text-2xl font-bold ${
-                  player.nb_point >= 0 ? "text-primary" : "text-red-600"
-                }`}
-              >
-                {player.nb_point}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Valeur actions</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {portfolio.totalValue.toFixed(0)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Dettes</p>
-              <p className="text-2xl font-bold text-red-600">
-                {player.nb_debt}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Patrimoine net</p>
-              <p
-                className={`text-2xl font-bold ${
-                  netWorth >= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {netWorth.toFixed(0)}
-              </p>
-            </div>
+    <div className="max-w-5xl mx-auto px-6 py-16 md:py-24 space-y-20">
+      <section className="relative">
+        <div
+          aria-hidden
+          className="ghost-headline absolute -top-6 -right-2 text-[120px] md:text-[180px] select-none"
+        >
+          hello.
+        </div>
+        <div className="relative pt-16 md:pt-24 space-y-3">
+          <span className="eyebrow">Tableau de bord</span>
+          <h1 className="text-5xl md:text-6xl font-medium tracking-[-0.03em] text-[#141413] leading-[1.02]">
+            Bonjour,
+            <br />
+            <span className="text-[#9A3A0A]">{player.player_name}.</span>
+          </h1>
+          <p className="text-[#555555] text-base md:text-lg max-w-md leading-relaxed pt-2">
+            Voici votre patrimoine en direct. Les marches bougent a chaque
+            seconde — restez a l'affut.
+          </p>
+        </div>
+      </section>
+
+      <section className={`relative rounded-[40px] border p-8 md:p-10 halo-soft ${
+        netWorth >= 0
+          ? "bg-[#FCFBFA] border-[#D1CDC7]"
+          : "bg-[#FCFBFA] border-[#CF4500]/40"
+      }`}>
+        <div className="flex items-center justify-between mb-8">
+          <span className="eyebrow">Resume financier</span>
+          <span className="hidden md:inline-flex items-center gap-2 text-xs text-[#696969]">
+            <span className="live-dot w-1.5 h-1.5 rounded-full bg-[#F37338]" />
+            En direct
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
+          <Stat label="Points" value={player.nb_point.toLocaleString()} tone={player.nb_point >= 0 ? "ink" : "alert"} />
+          <Stat label="Valeur actions" value={portfolio.totalValue.toFixed(0)} tone="link" />
+          <Stat label="Dettes" value={player.nb_debt.toLocaleString()} tone="alert" />
+          <Stat label="Patrimoine net" value={netWorth.toFixed(0)} tone={netWorth >= 0 ? "ink" : "alert"} />
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <div className="flex items-end justify-between gap-4">
+          <div className="space-y-2">
+            <span className="eyebrow">Marches</span>
+            <h2 className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#141413]">
+              Cours en direct.
+            </h2>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        <ShareChart
+          history={history}
+          currentPriceA={prices.priceA}
+          currentPriceB={prices.priceB}
+          playerShares={{
+            nb_share_A: player.nb_share_A,
+            avg_share_A_value: player.avg_share_A_value,
+            nb_share_B: player.nb_share_B,
+            avg_share_B_value: player.avg_share_B_value,
+          }}
+        />
+      </section>
 
-      {/* Graphique des actions */}
-      <ShareChart
-        history={shareHistory}
-        currentPriceA={prices.priceA}
-        currentPriceB={prices.priceB}
-        playerShares={{
-          nb_share_A: player.nb_share_A,
-          avg_share_A_value: player.avg_share_A_value,
-          nb_share_B: player.nb_share_B,
-          avg_share_B_value: player.avg_share_B_value,
-        }}
-      />
-
-      {/* Trading d'actions */}
-      <ShareTrading
-        player={player}
-        snapshot={snapshot}
-        onPlayerUpdate={handlePlayerUpdate}
-        onSnapshotUpdate={handleSnapshotUpdate}
-      />
-
-      <DailyReward
-        userId={user.id}
-        onRewardClaimed={async () => {
-          const { getPlayerByUserId } = await import("@/lib/supabase");
-          const updatedPlayer = await getPlayerByUserId(user.id);
-          if (updatedPlayer) {
-            onPlayerUpdate(updatedPlayer);
-          }
-        }}
-      />
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <span className="eyebrow">Recompense</span>
+          <h2 className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#141413]">
+            Bonus quotidien.
+          </h2>
+        </div>
+        <DailyReward
+          userId=""
+          onRewardClaimed={async () => {
+            try {
+              const updated = await api.player.me();
+              onPlayerUpdate(updated);
+            } catch (err) {
+              console.error(err);
+            }
+          }}
+        />
+      </section>
     </div>
   );
 }

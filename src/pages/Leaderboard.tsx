@@ -1,185 +1,181 @@
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import { getPlayersInfo } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import type { PlayerType } from "@/types";
 
-export function Leaderboard() {
+const POLL_INTERVAL = 10000;
+
+function useLeaderboardData() {
   const [players, setPlayers] = useState<PlayerType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const previousRef = useRef<string>("");
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    loadPlayers();
-  }, []);
-
-  const loadPlayers = async () => {
+  const load = useCallback(async () => {
     try {
-      setLoading(true);
-      const data = await getPlayersInfo();
-      // Trier par points décroissants
-      const sortedPlayers = data.sort((a, b) => b.nb_point - a.nb_point);
-      setPlayers(sortedPlayers);
+      const data = await api.leaderboard.list();
+      if (!mountedRef.current) return;
+      const key = JSON.stringify(data);
+      if (key !== previousRef.current) {
+        previousRef.current = key;
+        setPlayers(data);
+      }
     } catch (err) {
+      if (!mountedRef.current) return;
       setError("Erreur lors du chargement du classement");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
-  const getRankBadge = (index: number) => {
-    switch (index) {
-      case 0:
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white">🥇 1er</Badge>;
-      case 1:
-        return <Badge className="bg-gray-400 hover:bg-gray-500 text-white">🥈 2ème</Badge>;
-      case 2:
-        return <Badge className="bg-orange-400 hover:bg-orange-500 text-white">🥉 3ème</Badge>;
-      case 3:
-        return <Badge className="bg-blue-400 hover:bg-blue-500 text-white">4ème</Badge>;
-      case 4:
-        return <Badge className="bg-green-400 hover:bg-green-500 text-white">5ème</Badge>;
-      default:
-        return <Badge variant="outline">#{index + 1}</Badge>;
-    }
-  };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
-  const getRowStyle = (index: number) => {
-    switch (index) {
-      case 0:
-        return "bg-yellow-50/50";
-      case 1:
-        return "bg-gray-50/50";
-      case 2:
-        return "bg-orange-50/50";
-      case 3:
-        return "bg-blue-50/50";
-      case 4:
-        return "bg-green-50/50";
-      default:
-        return "";
-    }
-  };
+  useEffect(() => {
+    let ignore = false;
+    const doInitialLoad = async () => {
+      await load();
+      if (!ignore) setLoading(false);
+    };
+    doInitialLoad();
+    const id = setInterval(load, POLL_INTERVAL);
+    return () => {
+      ignore = true;
+      clearInterval(id);
+    };
+  }, [load]);
+
+  return { players, loading, error };
+}
+
+export function Leaderboard() {
+  const { players, loading, error } = useLeaderboardData();
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
-          <p className="text-muted-foreground">Classement de tous les joueurs</p>
+      <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="flex justify-center items-center h-48">
+          <Loader2 className="h-10 w-10 animate-spin text-[#141413]" />
         </div>
-        <Card>
-          <CardContent className="flex justify-center items-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          </CardContent>
-        </Card>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
-          <p className="text-muted-foreground">Classement de tous les joueurs</p>
-        </div>
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-destructive">{error}</p>
-          </CardContent>
-        </Card>
+      <div className="max-w-5xl mx-auto px-6 py-24">
+        <div className="rounded-[40px] border border-[#CF4500]/30 p-8 text-[#CF4500]">{error}</div>
       </div>
     );
   }
 
+  const podium = players.slice(0, 3);
+  const rest = players.slice(3);
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
-        <p className="text-muted-foreground">
-          Classement de tous les joueurs par nombre de points
-        </p>
-      </div>
+    <div className="relative max-w-5xl mx-auto px-6 py-16 md:py-24 space-y-20">
+      <section className="relative">
+        <div aria-hidden className="ghost-headline absolute -top-6 -right-2 text-[120px] md:text-[180px] select-none">rank.</div>
+        <div className="relative pt-12 md:pt-20 space-y-3">
+          <span className="eyebrow">Classement</span>
+          <h1 className="text-5xl md:text-6xl font-medium tracking-[-0.03em] text-[#141413] leading-[1.02]">Les meilleurs<br /><span className="text-[#9A3A0A]">a la barre.</span></h1>
+          <p className="text-[#555555] text-base md:text-lg max-w-md leading-relaxed pt-2">{players.length} joueur{players.length > 1 ? "s" : ""} classe{players.length > 1 ? "s" : ""} par leur magot. Mise a jour en temps reel.</p>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Classement</CardTitle>
-          <CardDescription>
-            {players.length} joueur{players.length > 1 ? 's' : ''} au total
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[600px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-24">Rang</TableHead>
-                  <TableHead>Joueur</TableHead>
-                  <TableHead className="text-right">Points</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {players.map((player, index) => (
-                  <TableRow key={player.id} className={getRowStyle(index)}>
-                    <TableCell>
-                      {getRankBadge(index)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Avatar>
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              {player.player_name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {player.is_online && (
-                            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full" title="En ligne"></span>
-                          )}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {player.player_name}
-                          </span>
-                          {player.is_online && (
-                            <span className="text-xs text-green-600">En ligne</span>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {player.nb_share_A > 0 && (
-                          <Badge variant="outline" className="text-xs text-blue-600 border-blue-300 bg-blue-50">{player.nb_share_A} GCC</Badge>
-                        )}
-                        {player.nb_share_B > 0 && (
-                          <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 bg-purple-50">{player.nb_share_B} GC</Badge>
-                        )}
-                        <span className="text-xl font-bold text-primary">
-                          {player.nb_point.toLocaleString()}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      {players.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <p className="text-muted-foreground">Aucun joueur dans le classement.</p>
-          </CardContent>
-        </Card>
+      {podium.length > 0 && (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          {podium.map((p, i) => <PodiumCard key={p.id} player={p} rank={i + 1} />)}
+        </section>
       )}
+
+      {rest.length > 0 && (
+        <section className="space-y-6">
+          <span className="eyebrow">Suivants</span>
+          <div className="rounded-[40px] border border-[#D1CDC7] bg-[#FCFBFA] divide-y divide-[#D1CDC7] overflow-hidden halo-soft">
+            {rest.map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between px-6 md:px-8 py-5 hover:bg-[#F3F0EE] transition-colors">
+                <div className="flex items-center gap-5 min-w-0">
+                  <span className="text-2xl font-medium tracking-[-0.03em] text-[#696969] tabular-nums w-10">#{i + 4}</span>
+                  <div className="flex flex-col items-center shrink-0">
+                    {!!p.is_online && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded-[999px] bg-[#F37338]/10 text-[#F37338] text-[10px] font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#F37338] live-dot" />En ligne
+                      </span>
+                    )}
+                    <div className="w-11 h-11 rounded-full bg-[#141413] text-[#F3F0EE] flex items-center justify-center font-medium overflow-hidden">
+                      {p.profile_photo ? (
+                        <img src={p.profile_photo} alt={p.player_name} className="w-full h-full object-cover" />
+                      ) : (
+                        p.player_name.charAt(0).toUpperCase()
+                      )}
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-[#141413] tracking-[-0.02em] truncate">{p.player_name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {p.nb_share_A > 0 && <span className="inline-flex text-xs font-medium text-[#3860BE] bg-white border border-[#3860BE]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_A} GCC</span>}
+                  {p.nb_share_B > 0 && <span className="inline-flex text-xs font-medium text-[#9A3A0A] bg-white border border-[#9A3A0A]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_B} GC</span>}
+                  <span className="text-xl font-medium text-[#141413] tracking-[-0.03em] tabular-nums">{p.nb_point.toLocaleString()}</span>
+                  <span className="text-xs uppercase tracking-[0.08em] text-[#696969] hidden sm:inline">pts</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function PodiumCard({ player, rank }: { player: PlayerType; rank: number }) {
+  const tones = [
+    { gradient: "linear-gradient(135deg, #F4E1C9 0%, #CF4500 100%)", label: "Or" },
+    { gradient: "linear-gradient(135deg, #E5DCD2 0%, #9A3A0A 100%)", label: "Argent" },
+    { gradient: "linear-gradient(135deg, #FCE3CC 0%, #F37338 100%)", label: "Bronze" },
+  ];
+  const tone = tones[rank - 1];
+  const offset = rank === 1 ? "" : rank === 2 ? "md:translate-y-8" : "md:translate-y-4";
+
+  return (
+    <div className={`relative ${offset}`}>
+      <div className="flex items-center justify-center gap-2 mb-3">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[999px] bg-white text-[#141413] text-[11px] font-bold tracking-[0.08em] uppercase shadow-sm">{tone.label}</span>
+        {!!player.is_online && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[999px] bg-white text-[#141413] text-[11px] font-medium shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#F37338] live-dot" />En ligne
+          </span>
+        )}
+      </div>
+      <div className="portrait-circle relative mx-auto max-w-[260px] overflow-hidden">
+        <div className="absolute inset-0" style={{ background: tone.gradient }} />
+        {player.profile_photo ? (
+          <img
+            src={player.profile_photo}
+            alt={player.player_name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[120px] font-medium text-white/95 tracking-[-0.04em]">{player.player_name.charAt(0).toUpperCase()}</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-6 text-center space-y-2 max-w-[260px] mx-auto">
+        <span className="eyebrow justify-center">Rang #{rank}</span>
+        <h3 className="text-2xl font-medium tracking-[-0.02em] text-[#141413] truncate">{player.player_name}</h3>
+        {(player.nb_share_A > 0 || player.nb_share_B > 0) && (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            {player.nb_share_A > 0 && <span className="inline-flex text-[10px] font-medium text-[#3860BE] bg-white border border-[#3860BE]/30 rounded-[999px] px-2.5 py-0.5 tracking-[-0.02em]">{player.nb_share_A} GCC</span>}
+            {player.nb_share_B > 0 && <span className="inline-flex text-[10px] font-medium text-[#9A3A0A] bg-white border border-[#9A3A0A]/30 rounded-[999px] px-2.5 py-0.5 tracking-[-0.02em]">{player.nb_share_B} GC</span>}
+          </div>
+        )}
+        <p className="text-3xl font-medium tracking-[-0.03em] text-[#9A3A0A] tabular-nums">{player.nb_point.toLocaleString()}<span className="text-sm text-[#696969] tracking-[0.08em] uppercase ml-2 align-middle">pts</span></p>
+      </div>
     </div>
   );
 }
