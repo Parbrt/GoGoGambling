@@ -1,5 +1,5 @@
 # -- Build stage --
-FROM node:24.14-alpine AS build
+FROM node:24 AS build
 
 ARG VITE_SUPABASE_URL
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
