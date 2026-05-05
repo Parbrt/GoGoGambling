@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/parbrt/gogogambling-backend:latest
+    image: ghcr.io/nexgear75/gogogambling-backend:latest
     restart: unless-stopped
     volumes:
       - gogo_data:/data
@@ -14,7 +14,7 @@ services:
       - PORT=3001
 
   gogogambling:
-    image: ghcr.io/parbrt/gogogambling:latest
+    image: ghcr.io/nexgear75/gogogambling:latest
     restart: unless-stopped
     networks:
       - web

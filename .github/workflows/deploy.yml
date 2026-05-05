@@ -10,8 +10,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  FRONTEND_IMAGE: parbrt/gogogambling
-  BACKEND_IMAGE: parbrt/gogogambling-backend
+  FRONTEND_IMAGE: nexgear75/gogogambling
+  BACKEND_IMAGE: nexgear75/gogogambling-backend
 
 jobs:
   build-and-push-frontend:
@@ -25,7 +25,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: parbrt
+          username: nexgear75
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Build and push frontend image
@@ -63,7 +63,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: parbrt
+          username: nexgear75
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Build and push backend image
@@ -105,7 +105,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u parbrt --password-stdin
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u nexgear75 --password-stdin
             cd ${{ secrets.VPS_DEPLOY_PATH }}
             docker compose pull
             docker compose up -d --remove-orphans

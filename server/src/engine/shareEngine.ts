@@ -46,8 +46,8 @@ const B = {
 
 // ── State ──────────────────────────────────────────────────
 
-let priceA = A.mu;
-let priceB = B.mu;
+let priceA: number = A.mu;
+let priceB: number = B.mu;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
 
