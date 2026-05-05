@@ -1,11 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
-import { CHICKEN_STATS, createChicken } from "@/lib/chickenGame";
+import { CHICKEN_STATS, createChicken, generatePopulation, calculateBets } from "@/lib/chickenGame";
 import { api } from "@/lib/api";
 
 interface ChickenFightProps {
@@ -25,6 +25,12 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
   const [resultMessage, setResultMessage] = useState<string>("");
   const [isWin, setIsWin] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [population, setPopulation] = useState<[number, number][]>(generatePopulation);
+
+  const betInfo = useMemo(
+    () => calculateBets(population, betAmount, selectedChicken),
+    [population, betAmount, selectedChicken]
+  );
 
   // Fight result details
   const [fightResult, setFightResult] = useState<{
@@ -77,6 +83,7 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
   const handleNextRound = useCallback(() => {
     setChickenA(createChicken()); setChickenB(createChicken());
     setSelectedChicken(null); setBetAmount(0);
+    setPopulation(generatePopulation());
     setPhase("betting"); setFightResult(null);
     setResultMessage(""); setError(null); setIsWin(false);
   }, []);
@@ -115,6 +122,14 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
                       {getStatBadge(displayA[idx])}
                     </div>
                   ))}
+                  <Separator />
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-sm font-medium">Cote</span>
+                    <Badge variant="default" className="font-bold">{betInfo.displayA}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground text-center">
+                    Mises: {betInfo.betA} pts
+                  </div>
                   {selectedChicken === 1 && <div className="mt-2 text-center"><Badge variant="outline" className="border-primary text-primary">✓ Selectionne</Badge></div>}
                 </CardContent>
               </Card>
@@ -127,6 +142,14 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
                       {getStatBadge(displayB[idx])}
                     </div>
                   ))}
+                  <Separator />
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-sm font-medium">Cote</span>
+                    <Badge variant="default" className="font-bold">{betInfo.displayB}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground text-center">
+                    Mises: {betInfo.betB} pts
+                  </div>
                   {selectedChicken === 2 && <div className="mt-2 text-center"><Badge variant="outline" className="border-primary text-primary">✓ Selectionne</Badge></div>}
                 </CardContent>
               </Card>
