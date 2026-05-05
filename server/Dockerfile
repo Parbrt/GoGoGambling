@@ -1,5 +1,7 @@
 FROM node:24.14-alpine
 
+RUN apk add --no-cache python3 make g++
+
 ARG SUPABASE_URL
 ARG SUPABASE_SERVICE_ROLE_KEY
 ARG VITE_SUPABASE_PUBLISHABLE_KEY
@@ -14,7 +16,7 @@ WORKDIR /app
 
 COPY server/package*.json ./
 
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && apk del python3 make g++
 
 COPY server/dist ./dist
 
