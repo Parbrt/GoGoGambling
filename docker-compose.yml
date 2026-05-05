@@ -24,16 +24,6 @@ services:
       - "traefik.http.routers.gogogambling.entrypoints=websecure"
       - "traefik.http.routers.gogogambling.tls.certresolver=letsencrypt"
       - "traefik.http.services.gogogambling.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.gogo-api.replacepathregex.regex=^/api/(.*)"
-      - "traefik.http.middlewares.gogo-api.replacepathregex.replacement=/api/$$1"
-      - "traefik.http.routers.gogogambling-api.rule=Host(`gogo.alexfougeroux.me`) && PathPrefix(`/api/`)"
-      - "traefik.http.routers.gogogambling-api.entrypoints=websecure"
-      - "traefik.http.routers.gogogambling-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.gogogambling-api.loadbalancer.server.port=3001"
-      - "traefik.http.routers.gogogambling-ws.rule=Host(`gogo.alexfougeroux.me`) && PathPrefix(`/ws`)"
-      - "traefik.http.routers.gogogambling-ws.entrypoints=websecure"
-      - "traefik.http.routers.gogogambling-ws.tls.certresolver=letsencrypt"
-      - "traefik.http.services.gogogambling-ws.loadbalancer.server.port=3001"
 
 volumes:
   gogo_data:
