@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/types.ts","./src/auth/middleware.ts","./src/db/connection.ts","./src/db/schema.ts","./src/engine/shareengine.ts","./src/routes/games.ts","./src/routes/leaderboard.ts","./src/routes/player.ts","./src/routes/shares.ts","./src/ws/index.ts"],"version":"5.9.3"}
