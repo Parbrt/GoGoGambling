@@ -2,13 +2,15 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { formatCompactPoints } from "@/lib/utils";
 
 interface HeaderProps {
   playerName: string;
+  points: number;
   onLogout: () => void;
 }
 
-export function Header({ playerName, onLogout }: HeaderProps) {
+export function Header({ playerName, points, onLogout }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
@@ -61,7 +63,12 @@ export function Header({ playerName, onLogout }: HeaderProps) {
               to="/profile"
               className="group flex items-center gap-1.5 text-sm text-[#696969] hover:text-[#141413] transition-colors font-medium tracking-[-0.02em] px-3 py-1.5 rounded-full border border-transparent hover:border-[#141413]/15 hover:bg-[#F3F0EE]"
             >
-              {playerName}
+              <span className="flex items-baseline gap-1">
+                {playerName}
+                <span className="text-xs text-[#696969]/70 font-normal tabular-nums">
+                  <span className="text-[#F37338]">·</span> {formatCompactPoints(points)} pts
+                </span>
+              </span>
               <svg className="w-3 h-3 text-[#696969] group-hover:text-[#141413] transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
@@ -103,6 +110,9 @@ export function Header({ playerName, onLogout }: HeaderProps) {
             className="text-3xl font-medium text-[#141413] tracking-[-0.03em] py-4 border-b border-[#D1CDC7]"
           >
             {playerName}
+            <span className="block text-base font-normal text-[#696969] mt-1 tabular-nums">
+              {formatCompactPoints(points)} pts
+            </span>
           </Link>
           <Button
             className="w-full mt-8"

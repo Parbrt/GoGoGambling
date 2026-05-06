@@ -213,7 +213,7 @@ export function BlackjackTable({
     tableState?.status === "results" || tableState?.status === "dealer_turn";
 
   return (
-    <div className="h-screen bg-[#F3F0EE] relative overflow-hidden flex flex-col">
+    <div className="min-h-[100dvh] bg-[#F3F0EE] relative flex flex-col">
       {/* Subtle felt accent */}
       <div
         aria-hidden
@@ -258,35 +258,42 @@ export function BlackjackTable({
         </div>
       </div>
 
-      {/* Main */}
-      <div className="relative z-10 max-w-5xl mx-auto px-4 py-4 flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Dealer area — fixed height so the box doesn't collapse when no cards */}
-        <div className="flex flex-col items-center gap-3">
+      {/* Main — scrollable on mobile, padded when action buttons are visible */}
+      <div className={`relative z-10 w-full max-w-5xl mx-auto px-4 py-4 flex flex-col gap-4 flex-1 overflow-y-auto ${showLocalActions ? "pb-36" : "pb-6"}`}>
+        {/* Dealer area — always the same fixed size */}
+        <div className="flex flex-col items-center gap-2">
           <span className="eyebrow">Croupier</span>
           <div
-            className="px-6 py-5 rounded-[32px] bg-white border border-[#D1CDC7] shadow-[0_8px_28px_rgba(20,20,19,0.06)] min-h-[148px] flex items-center justify-center"
+            className="w-full max-w-md rounded-[32px] bg-white border border-[#D1CDC7] shadow-[0_8px_28px_rgba(20,20,19,0.06)]"
+            style={{ height: "176px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}
           >
-            <BlackjackHand
-              cards={tableState?.dealerHand || []}
-              size="lg"
-              isDealing={
-                tableState?.status === "playing" ||
-                tableState?.status === "dealer_turn"
-              }
-              showScore={dealerScoreVisible || (tableState?.dealerScore ?? 0) > 0}
-              score={
-                dealerScoreVisible
-                  ? tableState?.dealerScore
-                  : tableState?.dealerScore && tableState.dealerScore > 0
-                  ? tableState.dealerScore
-                  : undefined
-              }
-              scoreTone={
-                dealerScoreVisible && (tableState?.dealerScore ?? 0) > 21
-                  ? "alert"
-                  : "ink"
-              }
-            />
+            {(tableState?.dealerHand?.length ?? 0) > 0 ? (
+              <BlackjackHand
+                cards={tableState?.dealerHand || []}
+                size="lg"
+                isDealing={
+                  tableState?.status === "playing" ||
+                  tableState?.status === "dealer_turn"
+                }
+                showScore={dealerScoreVisible || (tableState?.dealerScore ?? 0) > 0}
+                score={
+                  dealerScoreVisible
+                    ? tableState?.dealerScore
+                    : tableState?.dealerScore && tableState.dealerScore > 0
+                    ? tableState.dealerScore
+                    : undefined
+                }
+                scoreTone={
+                  dealerScoreVisible && (tableState?.dealerScore ?? 0) > 21
+                    ? "alert"
+                    : "ink"
+                }
+              />
+            ) : (
+              <span className="text-[#D1CDC7] text-sm font-medium tracking-[-0.01em]">
+                En attente de la manche
+              </span>
+            )}
           </div>
         </div>
 
@@ -466,7 +473,8 @@ export function BlackjackTable({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 80 }}
             transition={{ type: "spring", stiffness: 340, damping: 28 }}
-            className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-6 pt-3 bg-gradient-to-t from-[#F3F0EE] via-[#F3F0EE]/90 to-transparent"
+            className="fixed bottom-0 left-0 right-0 z-30 px-4 pt-3 bg-gradient-to-t from-[#F3F0EE] via-[#F3F0EE]/90 to-transparent"
+            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
           >
             {/* Round label + timer */}
             {tableState?.roundCount !== undefined && tableState.roundCount > 0 && (

@@ -78,7 +78,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
     <div className="min-h-screen bg-background flex flex-col">
       <ScrollToTop />
       <NotificationContainer />
-      <Header playerName={player.player_name} onLogout={handleLogout} />
+      <Header playerName={player.player_name} points={player.nb_point} onLogout={handleLogout} />
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home user={user} player={player} onPlayerUpdate={setPlayer} />} />
