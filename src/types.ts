@@ -16,6 +16,8 @@ export type PlayerType = {
   peak_net_worth: number
   last_daily_free_box?: string | null
   loto_tickets?: number
+  chicken_charges?: number
+  last_chicken_charge_refill?: string | null
 }
 
 export type ShareStats = {
@@ -47,4 +49,57 @@ export type LotoPlayResult = {
   prize_value: number
   won: boolean
   tickets_remaining: number
+}
+
+// Loto v2 types
+export type LotoTicket = {
+  id: number
+  user_id: string
+  player_name: string
+  ticket_number: string
+  draw_date: string
+  purchased_at: string
+  is_free: number
+}
+
+export type LotoDraw = {
+  id: number
+  draw_date: string
+  winning_numbers: string
+  grand_points: number
+  grand_boxes: string
+  grand_winner_user_id: string | null
+  grand_winner_name: string | null
+  small1_points: number
+  small1_boxes: string
+  small1_winner_user_id: string | null
+  small1_winner_name: string | null
+  small2_points: number
+  small2_boxes: string
+  small2_winner_user_id: string | null
+  small2_winner_name: string | null
+  status: string
+  drawn_at: string
+}
+
+export type LotoJackpot = {
+  grand_rollover_points: number
+  grand_rollover_boxes: string
+  small1_rollover_points: number
+  small1_rollover_boxes: string
+  small2_rollover_points: number
+  small2_rollover_boxes: string
+}
+
+export type LotoStatusResponse = {
+  tickets: LotoTicket[]
+  ticketCount: number
+  maxTickets: number
+  canClaim: boolean
+  canBuy: boolean
+  todayDraw: LotoDraw | null
+  jackpot: LotoJackpot
+  ticketPrice: number
+  nextDrawTime: string
+  draws: LotoDraw[]
 }

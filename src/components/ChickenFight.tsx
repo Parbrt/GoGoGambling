@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,12 +11,26 @@ import { api } from "@/lib/api";
 interface ChickenFightProps {
   userId: string;
   currentPoints: number;
+  initialCharges?: number;
+  initialLastChargeRefill?: string | null;
   onPointsUpdate: (newPoints: number) => void;
+  onChargesUpdate?: (charges: number, lastRefill: string | null) => void;
 }
 
 type GamePhase = "betting" | "fighting" | "result";
 
-export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProps) {
+const MAX_CHARGES = 5;
+const CHARGE_COOLDOWN_MS = 10 * 60 * 1000;
+
+function calcNextChargeMs(charges: number, lastRefill: string | null): number {
+  if (charges >= MAX_CHARGES || !lastRefill) return 0;
+  const now = Date.now();
+  const elapsed = now - new Date(lastRefill).getTime();
+  const remaining = CHARGE_COOLDOWN_MS - (elapsed % CHARGE_COOLDOWN_MS);
+  return Math.max(0, remaining);
+}
+
+export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, onPointsUpdate, onChargesUpdate }: ChickenFightProps) {
   const [chickenA, setChickenA] = useState<number[]>(createChicken);
   const [chickenB, setChickenB] = useState<number[]>(createChicken);
   const [betAmount, setBetAmount] = useState<number>(0);
@@ -27,12 +41,66 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
   const [error, setError] = useState<string | null>(null);
   const [population, setPopulation] = useState<[number, number][]>(generatePopulation);
 
+  // Charges state
+  const [charges, setCharges] = useState(initialCharges);
+  const [lastChargeRefill, setLastChargeRefill] = useState<string | null>(initialLastChargeRefill);
+  const [nextChargeMs, setNextChargeMs] = useState(() => calcNextChargeMs(initialCharges, initialLastChargeRefill));
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const betInfo = useMemo(
     () => calculateBets(population, betAmount, selectedChicken),
     [population, betAmount, selectedChicken]
   );
 
-  // Fight result details
+  // Timer for charge refill countdown
+  const chargesRef = useRef(charges);
+  const lastChargeRefillRef = useRef(lastChargeRefill);
+  const onChargesUpdateRef = useRef(onChargesUpdate);
+
+  // Sync refs after render (avoid accessing refs during render)
+  useEffect(() => {
+    chargesRef.current = charges;
+    lastChargeRefillRef.current = lastChargeRefill;
+    onChargesUpdateRef.current = onChargesUpdate;
+  });
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    const tick = () => {
+      const c = chargesRef.current;
+      const lr = lastChargeRefillRef.current;
+
+      if (c >= MAX_CHARGES) {
+        setNextChargeMs(0);
+        return;
+      }
+
+      const remaining = calcNextChargeMs(c, lr);
+      setNextChargeMs(remaining);
+
+      if (remaining <= 0 && c < MAX_CHARGES && lr) {
+        const now = Date.now();
+        const elapsed = now - new Date(lr).getTime();
+        const recovered = Math.floor(elapsed / CHARGE_COOLDOWN_MS);
+        if (recovered > 0) {
+          const newCharges = Math.min(MAX_CHARGES, c + recovered);
+          const newLastRefill = new Date(new Date(lr).getTime() + recovered * CHARGE_COOLDOWN_MS).toISOString();
+          const finalLastRefill = newCharges >= MAX_CHARGES ? new Date().toISOString() : newLastRefill;
+          setCharges(newCharges);
+          setLastChargeRefill(finalLastRefill);
+          onChargesUpdateRef.current?.(newCharges, finalLastRefill);
+        }
+      }
+    };
+
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
   const [fightResult, setFightResult] = useState<{
     winner: 1 | 2;
     scores: { a: number; b: number };
@@ -55,6 +123,7 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
 
   const handleStartFight = async () => {
     if (!selectedChicken || betAmount <= 0 || betAmount > currentPoints) return setError("Choisissez un poulet et une mise valide");
+    if (charges <= 0) return setError("Plus de charges disponibles, attendez la prochaine recharge");
 
     setPhase("fighting");
     setError(null);
@@ -72,7 +141,11 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
         setResultMessage("Vous avez perdu... La prochaine fois sera la bonne !");
       }
 
+      setCharges(result.chicken_charges);
+      setNextChargeMs(result.next_charge_in_ms);
+      setLastChargeRefill(result.player.last_chicken_charge_refill ?? null);
       onPointsUpdate(result.player.nb_point);
+      onChargesUpdate?.(result.chicken_charges, result.player.last_chicken_charge_refill ?? null);
       setPhase("result");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur");
@@ -108,6 +181,26 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
 
         <div className="text-center">
           <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{currentPoints}</span></p>
+        </div>
+
+        <div className="flex items-center justify-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">Charges:</span>
+          <div className="flex gap-1">
+            {Array.from({ length: MAX_CHARGES }, (_, i) => (
+              <div
+                key={i}
+                className={`w-4 h-4 rounded-full transition-colors ${
+                  i < charges ? "bg-primary" : "bg-muted-foreground/20"
+                }`}
+              />
+            ))}
+          </div>
+          <span className="text-sm font-bold text-primary">{charges}/{MAX_CHARGES}</span>
+          {charges < MAX_CHARGES && (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              +1 dans {Math.floor(nextChargeMs / 60000)}:{(Math.floor((nextChargeMs % 60000) / 1000)).toString().padStart(2, "0")}
+            </span>
+          )}
         </div>
 
         {phase === "betting" && (
@@ -171,8 +264,8 @@ export function ChickenFight({ currentPoints, onPointsUpdate }: ChickenFightProp
               </div>
             )}
 
-            <Button onClick={handleStartFight} disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints} className="w-full" size="lg">
-              {selectedChicken && betAmount > 0 ? `Lancer le combat (${betAmount} points)` : "Selectionnez un poulet et une mise"}
+            <Button onClick={handleStartFight} disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints || charges <= 0} className="w-full" size="lg">
+              {charges <= 0 ? "Aucune charge disponible" : selectedChicken && betAmount > 0 ? `Lancer le combat (${betAmount} points)` : "Selectionnez un poulet et une mise"}
             </Button>
           </>
         )}

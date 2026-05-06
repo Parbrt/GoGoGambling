@@ -17,6 +17,8 @@ export interface Player {
   last_daily_free_box: string | null;
   loto_tickets: number;
   last_loto_ticket_claim: string | null;
+  chicken_charges: number;
+  last_chicken_charge_refill: string | null;
 }
 
 export interface ShareSnapshot {
@@ -124,7 +126,7 @@ export interface BoxOpenResult {
   player: Player;
 }
 
-// Loto
+// Loto (legacy - kept for backward compat)
 export interface LotoHistoryEntry {
   id: number;
   user_id: string;
@@ -147,4 +149,57 @@ export interface LotoPlayResult {
   prize_value: number;
   won: boolean;
   tickets_remaining: number;
+}
+
+// Loto v2 — Ticket-based lottery system
+export interface LotoTicket {
+  id: number;
+  user_id: string;
+  player_name: string;
+  ticket_number: string;
+  draw_date: string;
+  purchased_at: string;
+  is_free: number;
+}
+
+export interface LotoDraw {
+  id: number;
+  draw_date: string;
+  winning_numbers: string; // JSON array
+  grand_points: number;
+  grand_boxes: string; // JSON array
+  grand_winner_user_id: string | null;
+  grand_winner_name: string | null;
+  small1_points: number;
+  small1_boxes: string;
+  small1_winner_user_id: string | null;
+  small1_winner_name: string | null;
+  small2_points: number;
+  small2_boxes: string;
+  small2_winner_user_id: string | null;
+  small2_winner_name: string | null;
+  status: string;
+  drawn_at: string;
+}
+
+export interface LotoJackpot {
+  grand_rollover_points: number;
+  grand_rollover_boxes: string;
+  small1_rollover_points: number;
+  small1_rollover_boxes: string;
+  small2_rollover_points: number;
+  small2_rollover_boxes: string;
+}
+
+export interface LotoStatusResponse {
+  tickets: LotoTicket[];
+  ticketCount: number;
+  maxTickets: number;
+  canClaim: boolean;
+  canBuy: boolean;
+  todayDraw: LotoDraw | null;
+  jackpot: LotoJackpot;
+  ticketPrice: number;
+  nextDrawTime: string;
+  draws: LotoDraw[];
 }

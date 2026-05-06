@@ -182,6 +182,8 @@ export const api = {
         isWin: boolean;
         winnings: number;
         population: [number, number][];
+        chicken_charges: number;
+        next_charge_in_ms: number;
       }>("/api/games/chicken/fight", { bet, selectedChicken, chickenA, chickenB }),
     babyFight: {
       state: () =>
@@ -274,6 +276,17 @@ export const api = {
       post<{ tickets: number; canClaim: boolean }>("/api/loto/claim-ticket"),
     play: () => post<LotoPlayResult>("/api/loto/play"),
     history: () => get<LotoHistoryEntry[]>("/api/loto/history"),
+    // v2
+    status: () =>
+      get<import("@/types").LotoStatusResponse>("/api/loto/status"),
+    buy: () =>
+      post<{ tickets: import("@/types").LotoTicket[]; ticketCount: number; player: PlayerType }>("/api/loto/buy"),
+    claimFreeTicket: () =>
+      post<{ tickets: import("@/types").LotoTicket[]; ticketCount: number; canClaim: boolean }>("/api/loto/claim-ticket"),
+    draws: () =>
+      get<import("@/types").LotoDraw[]>("/api/loto/draws"),
+    drawByDate: (date: string) =>
+      get<{ draw: import("@/types").LotoDraw; tickets: import("@/types").LotoTicket[] }>(`/api/loto/draws/${date}`),
   },
 
   shop: {

@@ -69,7 +69,7 @@ const multiGames: Game[] = [
     id: "loto",
     name: "Loto",
     description:
-      "Tentez votre chance au tirage. Jackpot à 50 000 pts, lots mystères et tickets bonus à gagner.",
+      "Achetez vos tickets, choisissez vos numeros. Tirage a midi. Jackpot jusqu'a 1M+ pts et coffres a gagner.",
     icon: "🎱",
     path: "/loto",
     tone: "linear-gradient(135deg, #E8D5F5 0%, #7C3AED 100%)",

@@ -21,7 +21,9 @@ export function initSchema(): void {
       last_seen TEXT,
       profile_photo TEXT,
       loto_tickets INTEGER NOT NULL DEFAULT 0,
-      last_loto_ticket_claim TEXT
+      last_loto_ticket_claim TEXT,
+      chicken_charges INTEGER NOT NULL DEFAULT 5,
+      last_chicken_charge_refill TEXT
     );
 
     CREATE TABLE IF NOT EXISTS shares (
@@ -74,6 +76,9 @@ export function initSchema(): void {
   migrateLotoTicketsColumn(db);
   migrateLastLotoTicketClaimColumn(db);
 
+  // Migrate: add chicken charges columns
+  migrateChickenChargesColumns(db);
+
   // Create baby fight tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS baby_fights (
@@ -116,7 +121,7 @@ export function initSchema(): void {
   // Create shop / loot box tables
   createShopTables(db);
 
-  // Create loto history table
+  // Create loto history table (legacy)
   db.exec(`
     CREATE TABLE IF NOT EXISTS loto_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,6 +137,9 @@ export function initSchema(): void {
 
     CREATE INDEX IF NOT EXISTS idx_loto_history_created ON loto_history(created_at DESC);
   `);
+
+  // Create loto v2 tables
+  createLotoV2Tables(db);
 
   // Reset stale online status on server startup
   resetOnlineStatus(db);
@@ -273,9 +281,11 @@ function migrateAvgShareColumns(db: ReturnType<typeof getDb>): void {
         last_seen TEXT,
         profile_photo TEXT,
         loto_tickets INTEGER NOT NULL DEFAULT 0,
-        last_loto_ticket_claim TEXT
+        last_loto_ticket_claim TEXT,
+        chicken_charges INTEGER NOT NULL DEFAULT 5,
+        last_chicken_charge_refill TEXT
       );
-      INSERT INTO players_migrated SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, avg_share_A_value, nb_share_B, avg_share_B_value, last_login, last_daily_reward_claim, is_online, NULL, NULL, 0, NULL FROM players;
+      INSERT INTO players_migrated SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, avg_share_A_value, nb_share_B, avg_share_B_value, last_login, last_daily_reward_claim, is_online, NULL, NULL, 0, NULL, 5, NULL FROM players;
       DROP TABLE players;
       ALTER TABLE players_migrated RENAME TO players;
     `);
@@ -352,5 +362,88 @@ function migrateMarketplaceStatusColumn(db: ReturnType<typeof getDb>): void {
   if (!info.find(c => c.name === "status")) {
     db.prepare("ALTER TABLE marketplace_listings ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run();
     console.log("[schema] Added status column to marketplace_listings");
+  }
+}
+
+function createLotoV2Tables(db: ReturnType<typeof getDb>): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS loto_tickets_v2 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      ticket_number TEXT NOT NULL,
+      draw_date TEXT NOT NULL,
+      is_free INTEGER NOT NULL DEFAULT 0,
+      purchased_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_loto_tickets_v2_draw ON loto_tickets_v2(draw_date);
+    CREATE INDEX IF NOT EXISTS idx_loto_tickets_v2_user_draw ON loto_tickets_v2(user_id, draw_date);
+    CREATE INDEX IF NOT EXISTS idx_loto_tickets_v2_number_draw ON loto_tickets_v2(ticket_number, draw_date);
+
+    CREATE TABLE IF NOT EXISTS loto_draws (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      draw_date TEXT NOT NULL UNIQUE,
+      winning_numbers TEXT NOT NULL DEFAULT '[]',
+      grand_points INTEGER NOT NULL DEFAULT 1000000,
+      grand_boxes TEXT NOT NULL DEFAULT '["GAMBLINGBOX"]',
+      grand_winner_user_id TEXT,
+      grand_winner_name TEXT,
+      small1_points INTEGER NOT NULL DEFAULT 250000,
+      small1_boxes TEXT NOT NULL DEFAULT '["GOGOBOX","XBOX"]',
+      small1_winner_user_id TEXT,
+      small1_winner_name TEXT,
+      small2_points INTEGER NOT NULL DEFAULT 50000,
+      small2_boxes TEXT NOT NULL DEFAULT '["XBOX"]',
+      small2_winner_user_id TEXT,
+      small2_winner_name TEXT,
+      status TEXT NOT NULL DEFAULT 'completed',
+      drawn_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_loto_draws_date ON loto_draws(draw_date DESC);
+
+    CREATE TABLE IF NOT EXISTS loto_jackpot (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      grand_rollover_points INTEGER NOT NULL DEFAULT 0,
+      grand_rollover_boxes TEXT NOT NULL DEFAULT '[]',
+      small1_rollover_points INTEGER NOT NULL DEFAULT 0,
+      small1_rollover_boxes TEXT NOT NULL DEFAULT '[]',
+      small2_rollover_points INTEGER NOT NULL DEFAULT 0,
+      small2_rollover_boxes TEXT NOT NULL DEFAULT '[]',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  migrateLotoV2Tables(db);
+  migrateLotoTicketsV2IsFree(db);
+}
+
+function migrateLotoV2Tables(db: ReturnType<typeof getDb>): void {
+  // Ensure loto_jackpot has a default row
+  const jackpot = db.prepare("SELECT id FROM loto_jackpot LIMIT 1").get();
+  if (!jackpot) {
+    db.prepare("INSERT INTO loto_jackpot (id) VALUES (1)").run();
+  }
+}
+
+function migrateLotoTicketsV2IsFree(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(loto_tickets_v2)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "is_free")) {
+    db.prepare("ALTER TABLE loto_tickets_v2 ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0").run();
+    console.log("[schema] Added is_free column to loto_tickets_v2");
+  }
+}
+
+function migrateChickenChargesColumns(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "chicken_charges")) {
+    db.prepare("ALTER TABLE players ADD COLUMN chicken_charges INTEGER NOT NULL DEFAULT 5").run();
+    console.log("[schema] Added chicken_charges column");
+  }
+  if (!info.find(c => c.name === "last_chicken_charge_refill")) {
+    db.prepare("ALTER TABLE players ADD COLUMN last_chicken_charge_refill TEXT").run();
+    console.log("[schema] Added last_chicken_charge_refill column");
   }
 }

@@ -200,6 +200,49 @@ router.post("/roulette/spin", authMiddleware, (req: AuthenticatedRequest, res) =
 
 // --- Chicken Fight ---
 
+const CHICKEN_CHARGE_MAX = 5;
+const CHICKEN_CHARGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function refillChickenCharges(player: Player): { chicken_charges: number; last_chicken_charge_refill: string | null } {
+  let charges = player.chicken_charges ?? CHICKEN_CHARGE_MAX;
+  let lastRefill = player.last_chicken_charge_refill;
+
+  if (charges >= CHICKEN_CHARGE_MAX) {
+    // Already full, update refill timestamp to now so it doesn't accumulate past max
+    return { chicken_charges: CHICKEN_CHARGE_MAX, last_chicken_charge_refill: new Date().toISOString() };
+  }
+
+  if (!lastRefill) {
+    lastRefill = new Date().toISOString();
+  }
+
+  const now = Date.now();
+  const lastRefillMs = new Date(lastRefill).getTime();
+  const elapsed = now - lastRefillMs;
+  const recovered = Math.floor(elapsed / CHICKEN_CHARGE_COOLDOWN_MS);
+
+  if (recovered > 0) {
+    charges = Math.min(CHICKEN_CHARGE_MAX, charges + recovered);
+    const newLastRefill = new Date(lastRefillMs + recovered * CHICKEN_CHARGE_COOLDOWN_MS);
+    lastRefill = newLastRefill.toISOString();
+  }
+
+  if (charges >= CHICKEN_CHARGE_MAX) {
+    lastRefill = new Date().toISOString();
+  }
+
+  return { chicken_charges: charges, last_chicken_charge_refill: lastRefill };
+}
+
+function getChickenNextChargeMs(charges: number, lastRefill: string | null): number {
+  if (charges >= CHICKEN_CHARGE_MAX || !lastRefill) return 0;
+  const now = Date.now();
+  const lastRefillMs = new Date(lastRefill).getTime();
+  const elapsed = now - lastRefillMs;
+  const remaining = CHICKEN_CHARGE_COOLDOWN_MS - (elapsed % CHICKEN_CHARGE_COOLDOWN_MS);
+  return Math.max(0, remaining);
+}
+
 function randint(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -278,6 +321,21 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
     return;
   }
 
+  // Refill charges
+  const refillResult = refillChickenCharges(player);
+  player.chicken_charges = refillResult.chicken_charges;
+  player.last_chicken_charge_refill = refillResult.last_chicken_charge_refill;
+
+  if (player.chicken_charges <= 0) {
+    const nextChargeMs = getChickenNextChargeMs(player.chicken_charges, player.last_chicken_charge_refill);
+    res.status(429).json({
+      error: "Plus de charges disponibles",
+      chicken_charges: player.chicken_charges,
+      next_charge_in_ms: nextChargeMs,
+    });
+    return;
+  }
+
   const chickenA = clientA?.length === 5 ? clientA : createChicken();
   const chickenB = clientB?.length === 5 ? clientB : createChicken();
   const population = generatePopulation();
@@ -289,7 +347,12 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
   const winnings = isWin ? Math.round(bet * selectedOdds) : 0;
   const newPoints = Math.round(player.nb_point - bet + winnings);
 
-  db.prepare("UPDATE players SET nb_point = ? WHERE user_id = ?").run(newPoints, req.userId!);
+  // Consume one charge
+  const newCharges = player.chicken_charges - 1;
+  const nextChargeMs = getChickenNextChargeMs(newCharges, player.last_chicken_charge_refill);
+
+  db.prepare("UPDATE players SET nb_point = ?, chicken_charges = ?, last_chicken_charge_refill = ? WHERE user_id = ?")
+    .run(newPoints, newCharges, player.last_chicken_charge_refill, req.userId!);
 
   updatePeakNetWorth(req.userId!);
 
@@ -305,6 +368,8 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
     isWin,
     winnings,
     population,
+    chicken_charges: updated.chicken_charges,
+    next_charge_in_ms: nextChargeMs,
   });
 });
 
