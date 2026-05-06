@@ -226,9 +226,12 @@ export function getItemsByCategory(category: ItemCategory): CatalogItem[] {
 }
 
 // ─── Roll item from a box ───
-export function rollBoxItem(boxKey: BoxType): {
+export function rollBoxItem(
+  boxKey: BoxType,
+  excludeNames: string[] = []
+): {
   item: CatalogItem;
-  rolledRarity: Rarity;
+  rolledRarity: Rarity | null;
 } {
   const box = LOOT_BOXES.find((b) => b.key === boxKey);
   if (!box) throw new Error(`Box ${boxKey} not found`);
@@ -237,6 +240,7 @@ export function rollBoxItem(boxKey: BoxType): {
   const roll = Math.random() * 100;
   let cumulative = 0;
   let rolledRarity: Rarity = "common";
+  const excludeSet = new Set(excludeNames);
 
   for (const rarity of RARITIES) {
     const prob = box.probabilities[rarity];
@@ -248,18 +252,26 @@ export function rollBoxItem(boxKey: BoxType): {
     }
   }
 
-  // 2. Pick a random item of that rarity (excluding "points" category — handled by caller)
-  const candidates = ITEMS_CATALOG.filter(
-    (i) => i.rarity === rolledRarity && i.category !== "points"
-  );
+  // 2. Pick a random item of that rarity (excluding "points" category and excluded names)
+  //    For unique items, fall through to lower rarities if all are excluded
+  const currentRarity: Rarity = rolledRarity;
+  const rarityOrder = RARITIES.slice(RARITIES.indexOf(currentRarity));
 
-  if (candidates.length === 0) {
-    // Fallback: pick any item of any rarity
-    const fallback = ITEMS_CATALOG.filter((i) => i.category !== "points");
-    const item = fallback[Math.floor(Math.random() * fallback.length)];
-    return { item, rolledRarity: item.rarity };
+  for (const rarity of rarityOrder) {
+    const candidates = ITEMS_CATALOG.filter(
+      (i) =>
+        i.rarity === rarity &&
+        i.category !== "points" &&
+        !excludeSet.has(i.name)
+    );
+
+    if (candidates.length > 0) {
+      const item =
+        candidates[Math.floor(Math.random() * candidates.length)];
+      return { item, rolledRarity: item.rarity };
+    }
   }
 
-  const item = candidates[Math.floor(Math.random() * candidates.length)];
-  return { item, rolledRarity };
+  // No items available at all — return null to signal caller
+  return { item: undefined as unknown as CatalogItem, rolledRarity: null };
 }

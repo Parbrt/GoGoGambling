@@ -3,9 +3,29 @@ import { cacheGet, cacheSet, cacheHas, cacheIsFresh } from "./cache";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
+let tokenRefreshPromise: Promise<string | null> | null = null;
+
 async function getToken(): Promise<string | null> {
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  if (!data.session) return null;
+
+  const expiresAt = data.session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+  const refreshThreshold = 5 * 60; // 5 minutes before expiry
+
+  if (expiresAt && expiresAt - now < refreshThreshold) {
+    if (tokenRefreshPromise) {
+      return tokenRefreshPromise;
+    }
+    tokenRefreshPromise = supabase.auth.refreshSession().then(({ data: refreshed }) => {
+      return refreshed.session?.access_token ?? data.session!.access_token;
+    }).finally(() => {
+      tokenRefreshPromise = null;
+    });
+    return tokenRefreshPromise;
+  }
+
+  return data.session.access_token;
 }
 
 function timeout<T>(ms: number, promise: Promise<T>): Promise<T> {
@@ -18,11 +38,13 @@ function timeout<T>(ms: number, promise: Promise<T>): Promise<T> {
   });
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}, retry = true): Promise<T> {
   const controller = new AbortController();
 
-  const doRequest = async (): Promise<T> => {
-    const token = await getToken();
+  const doRequest = async (forceFresh = false): Promise<T> => {
+    const token = forceFresh
+      ? await supabase.auth.refreshSession().then(({ data }) => data.session?.access_token ?? null).catch(() => null)
+      : await getToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string> || {}),
@@ -34,6 +56,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       headers,
       signal: controller.signal,
     });
+
+    if (res.status === 401 && retry && !forceFresh) {
+      return doRequest(true);
+    }
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

@@ -67,6 +67,9 @@ export function initSchema(): void {
   // Migrate: add loto columns for existing databases
   migrateLotoColumns(db);
 
+  // Migrate: add status column to marketplace_listings
+  migrateMarketplaceStatusColumn(db);
+
   // Migrate: add loto columns for existing databases
   migrateLotoTicketsColumn(db);
   migrateLastLotoTicketClaimColumn(db);
@@ -341,5 +344,13 @@ function migrateLotoColumns(db: ReturnType<typeof getDb>): void {
   if (!info.find(c => c.name === "last_loto_ticket_claim")) {
     db.prepare("ALTER TABLE players ADD COLUMN last_loto_ticket_claim TEXT").run();
     console.log("[schema] Added last_loto_ticket_claim column");
+  }
+}
+
+function migrateMarketplaceStatusColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(marketplace_listings)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "status")) {
+    db.prepare("ALTER TABLE marketplace_listings ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run();
+    console.log("[schema] Added status column to marketplace_listings");
   }
 }

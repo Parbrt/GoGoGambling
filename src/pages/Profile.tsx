@@ -2,13 +2,12 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { cacheGet } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DebtManager } from "@/components/DebtManager";
 import { Inventory } from "@/components/Inventory";
 import type { PlayerType } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { TrendingUp, TrendingDown, Minus, User as UserIcon, WifiOff, Banknote, Camera, Loader2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, User as UserIcon, WifiOff, Banknote, Camera, Loader2, AlertTriangle, Wallet } from "lucide-react";
 
 interface ProfileProps {
   user: User;
@@ -66,6 +65,8 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
   const [loanAmount, setLoanAmount] = useState<number>(0);
   const maxLoan = Math.max(0, MAX_DEBT - player.nb_debt);
 
+  const [repayAmount, setRepayAmount] = useState<number>(0);
+
   const handleLoan = async () => {
     if (loanAmount <= 0 || loanAmount > maxLoan) return;
     await handlePlayerUpdate({
@@ -75,6 +76,18 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
     });
     setLoanAmount(0);
   };
+
+  const handleRepay = () => {
+    if (repayAmount <= 0 || repayAmount > player.nb_debt || repayAmount > player.nb_point) return;
+    onPlayerUpdate({
+      ...player,
+      nb_point: player.nb_point - repayAmount,
+      nb_debt: player.nb_debt - repayAmount,
+    });
+    setRepayAmount(0);
+  };
+
+  const maxRepayable = Math.min(player.nb_debt, player.nb_point);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "Jamais";
@@ -213,105 +226,149 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
         </div>
       </section>
 
-      <section className={`relative rounded-[40px] border p-8 md:p-10 halo-soft ${netWorth >= 0 ? "bg-[#FCFBFA] border-[#D1CDC7]" : "bg-[#FCFBFA] border-[#CF4500]/40"}`}>
-        <div className="flex items-center justify-between mb-8"><span className="eyebrow">Resume financier</span></div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
-          <div className="space-y-1.5">
-            <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Points</p>
-            <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${player.nb_point >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{player.nb_point}</p>
+      <section className={`rounded-[40px] border p-8 md:p-10 halo-soft space-y-8 ${netWorth >= 0 ? "bg-[#FCFBFA] border-[#D1CDC7]" : "bg-[#FCFBFA] border-[#CF4500]/40"}`}>
+        <div>
+          <div className="flex items-center justify-between mb-8"><span className="eyebrow">Resume financier</span></div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Points</p>
+              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${player.nb_point >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{player.nb_point}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Valeur actions</p>
+              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#3860BE] tabular-nums">{portfolio.totalValue.toFixed(0)}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Dettes</p>
+              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#CF4500] tabular-nums">{player.nb_debt}</p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Patrimoine net</p>
+              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${netWorth >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{netWorth.toFixed(0)}</p>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Valeur actions</p>
-            <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#3860BE] tabular-nums">{portfolio.totalValue.toFixed(0)}</p>
+        </div>
+
+        <div className="border-t border-[#D1CDC7] pt-8">
+          <span className="eyebrow">Portefeuille</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className="p-5 bg-[#F3F0EE] rounded-[16px]">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-[#3860BE] font-medium">GoGoCoin (GCC)</p>
+                  <p className="text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-1">{player.nb_share_A} <span className="text-lg text-[#696969]">actions</span></p>
+                  {player.nb_share_A > 0 && <p className="text-sm text-[#696969] mt-1">Prix moyen: {player.avg_share_A_value.toFixed(2)} pts</p>}
+                </div>
+                {player.nb_share_A > 0 && (
+                  <div className="text-right">
+                    <div className={`flex items-center gap-1 ${getProfitColor(portfolio.profitA)}`}>
+                      {getProfitIcon(portfolio.profitA)}
+                      <span className="font-medium text-sm">{portfolio.profitA >= 0 ? "+" : ""}{portfolio.profitA.toFixed(2)} pts</span>
+                    </div>
+                    <p className="text-xs text-[#696969] mt-1">Valeur: {(player.nb_share_A * prices.priceA).toFixed(0)} pts</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-5 bg-[#F3F0EE] rounded-[16px]">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-[#9A3A0A] font-medium">GamblingCoin (GC)</p>
+                  <p className="text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-1">{player.nb_share_B} <span className="text-lg text-[#696969]">actions</span></p>
+                  {player.nb_share_B > 0 && <p className="text-sm text-[#696969] mt-1">Prix moyen: {player.avg_share_B_value.toFixed(2)} pts</p>}
+                </div>
+                {player.nb_share_B > 0 && (
+                  <div className="text-right">
+                    <div className={`flex items-center gap-1 ${getProfitColor(portfolio.profitB)}`}>
+                      {getProfitIcon(portfolio.profitB)}
+                      <span className="font-medium text-sm">{portfolio.profitB >= 0 ? "+" : ""}{portfolio.profitB.toFixed(2)} pts</span>
+                    </div>
+                    <p className="text-xs text-[#696969] mt-1">Valeur: {(player.nb_share_B * prices.priceB).toFixed(0)} pts</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Dettes</p>
-            <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#CF4500] tabular-nums">{player.nb_debt}</p>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Patrimoine net</p>
-            <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${netWorth >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{netWorth.toFixed(0)}</p>
-          </div>
+          {(player.nb_share_A > 0 || player.nb_share_B > 0) && (
+            <div className="flex justify-between items-center pt-2 mt-4 border-t border-[#D1CDC7]">
+              <span className="font-medium text-[#141413] tracking-[-0.02em]">Profit/Perte total</span>
+              <span className={`text-xl font-medium tracking-[-0.02em] tabular-nums ${getProfitColor(portfolio.totalProfit)}`}>
+                {portfolio.totalProfit >= 0 ? "+" : ""}{portfolio.totalProfit.toFixed(2)} pts
+              </span>
+            </div>
+          )}
         </div>
       </section>
 
-      <div className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[40px] p-8 space-y-6 halo-soft">
-        <span className="eyebrow">Portefeuille</span>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-5 bg-[#F3F0EE] rounded-[16px]">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-[#3860BE] font-medium">GoGoCoin (GCC)</p>
-                <p className="text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-1">{player.nb_share_A} <span className="text-lg text-[#696969]">actions</span></p>
-                {player.nb_share_A > 0 && <p className="text-sm text-[#696969] mt-1">Prix moyen: {player.avg_share_A_value.toFixed(2)} pts</p>}
-              </div>
-              {player.nb_share_A > 0 && (
-                <div className="text-right">
-                  <div className={`flex items-center gap-1 ${getProfitColor(portfolio.profitA)}`}>
-                    {getProfitIcon(portfolio.profitA)}
-                    <span className="font-medium text-sm">{portfolio.profitA >= 0 ? "+" : ""}{portfolio.profitA.toFixed(2)} pts</span>
-                  </div>
-                  <p className="text-xs text-[#696969] mt-1">Valeur: {(player.nb_share_A * prices.priceA).toFixed(0)} pts</p>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="p-5 bg-[#F3F0EE] rounded-[16px]">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-[#9A3A0A] font-medium">GamblingCoin (GC)</p>
-                <p className="text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-1">{player.nb_share_B} <span className="text-lg text-[#696969]">actions</span></p>
-                {player.nb_share_B > 0 && <p className="text-sm text-[#696969] mt-1">Prix moyen: {player.avg_share_B_value.toFixed(2)} pts</p>}
-              </div>
-              {player.nb_share_B > 0 && (
-                <div className="text-right">
-                  <div className={`flex items-center gap-1 ${getProfitColor(portfolio.profitB)}`}>
-                    {getProfitIcon(portfolio.profitB)}
-                    <span className="font-medium text-sm">{portfolio.profitB >= 0 ? "+" : ""}{portfolio.profitB.toFixed(2)} pts</span>
-                  </div>
-                  <p className="text-xs text-[#696969] mt-1">Valeur: {(player.nb_share_B * prices.priceB).toFixed(0)} pts</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        {(player.nb_share_A > 0 || player.nb_share_B > 0) && (
-          <div className="flex justify-between items-center pt-2 border-t border-[#D1CDC7]">
-            <span className="font-medium text-[#141413] tracking-[-0.02em]">Profit/Perte total</span>
-            <span className={`text-xl font-medium tracking-[-0.02em] tabular-nums ${getProfitColor(portfolio.totalProfit)}`}>
-              {portfolio.totalProfit >= 0 ? "+" : ""}{portfolio.totalProfit.toFixed(2)} pts
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[40px] p-8 space-y-6 halo-soft">
-        <div className="space-y-2">
-          <span className="eyebrow">Credit</span>
-          <div className="flex items-center gap-3"><Banknote className="w-6 h-6 text-[#141413]" /><h3 className="text-2xl font-medium tracking-[-0.03em] text-[#141413]">Emprunter des points</h3></div>
-        </div>
-        <div className="flex justify-between items-center">
-          <div><p className="text-sm text-[#696969]">Dette actuelle</p><p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{player.nb_debt} / {MAX_DEBT} pts</p></div>
-          <div className="text-right"><p className="text-sm text-[#696969]">Disponible</p><p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{maxLoan} pts</p></div>
-        </div>
-        {maxLoan > 0 ? (
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-[#141413]">Montant (max: {maxLoan} pts, interet 10%)</label>
-            <div className="flex gap-2">
-              <Input type="number" min={1} max={maxLoan} value={loanAmount} onChange={(e) => setLoanAmount(Math.min(parseInt(e.target.value) || 0, maxLoan))} className="flex-1" />
-              <Button variant="outline" onClick={() => setLoanAmount(maxLoan)}>Max</Button>
-              <Button onClick={handleLoan} disabled={loanAmount <= 0}>Emprunter</Button>
-            </div>
-            {loanAmount > 0 && <p className="text-xs text-[#696969]">Vous recevrez {loanAmount} pts et devrez rembourser {Math.round(loanAmount * (1 + INTEREST_RATE))} pts</p>}
-          </div>
-        ) : (
-          <div className="p-4 bg-[#F3F0EE] rounded-[16px] text-sm text-[#696969]">Plafond d'emprunt atteint ({MAX_DEBT} pts). Remboursez vos dettes pour pouvoir emprunter a nouveau.</div>
-        )}
-      </div>
-
-      <DebtManager player={player} onPlayerUpdate={handlePlayerUpdate} />
-
       <Inventory />
+
+      <div className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[40px] p-8 md:p-10 halo-soft space-y-8">
+        <div>
+          <div className="space-y-2 mb-6">
+            <span className="eyebrow">Credit</span>
+            <div className="flex items-center gap-3"><Banknote className="w-6 h-6 text-[#141413]" /><h3 className="text-2xl font-medium tracking-[-0.03em] text-[#141413]">Emprunter des points</h3></div>
+          </div>
+          <div className="flex justify-between items-center">
+            <div><p className="text-sm text-[#696969]">Dette actuelle</p><p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{player.nb_debt} / {MAX_DEBT} pts</p></div>
+            <div className="text-right"><p className="text-sm text-[#696969]">Disponible</p><p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{maxLoan} pts</p></div>
+          </div>
+          {maxLoan > 0 ? (
+            <div className="space-y-3 mt-4">
+              <label className="text-sm font-medium text-[#141413]">Montant (max: {maxLoan} pts, interet 10%)</label>
+              <div className="flex gap-2">
+                <Input type="number" min={1} max={maxLoan} value={loanAmount} onChange={(e) => setLoanAmount(Math.min(parseInt(e.target.value) || 0, maxLoan))} className="flex-1" />
+                <Button variant="outline" onClick={() => setLoanAmount(maxLoan)}>Max</Button>
+                <Button onClick={handleLoan} disabled={loanAmount <= 0}>Emprunter</Button>
+              </div>
+              {loanAmount > 0 && <p className="text-xs text-[#696969]">Vous recevrez {loanAmount} pts et devrez rembourser {Math.round(loanAmount * (1 + INTEREST_RATE))} pts</p>}
+            </div>
+          ) : (
+            <div className="p-4 bg-[#F3F0EE] rounded-[16px] text-sm text-[#696969] mt-4">Plafond d'emprunt atteint ({MAX_DEBT} pts). Remboursez vos dettes pour pouvoir emprunter a nouveau.</div>
+          )}
+        </div>
+
+        <div className="border-t border-[#D1CDC7] pt-8">
+          <span className="eyebrow">Remboursement</span>
+          {player.nb_debt > 0 ? (
+            <div className="mt-6 space-y-6">
+              <div className="flex items-center gap-3 text-[#CF4500]">
+                <AlertTriangle className="w-6 h-6" />
+                <h3 className="text-2xl font-medium tracking-[-0.03em]">Gestion des Dettes</h3>
+              </div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-[#696969]">Dette totale</p>
+                  <p className="text-2xl font-medium tracking-[-0.02em] text-[#CF4500]">{player.nb_debt} pts</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-[#696969]">Points disponibles</p>
+                  <p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{player.nb_point} pts</p>
+                </div>
+              </div>
+              {player.nb_point > 0 ? (
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-[#141413]">Montant a rembourser (max: {maxRepayable} pts)</label>
+                  <div className="flex gap-2">
+                    <Input type="number" min={0} max={maxRepayable} value={repayAmount} onChange={(e) => setRepayAmount(Math.min(parseInt(e.target.value) || 0, maxRepayable))} className="flex-1" />
+                    <Button variant="outline" onClick={() => setRepayAmount(maxRepayable)}>Max</Button>
+                    <Button onClick={handleRepay} disabled={repayAmount <= 0 || repayAmount > player.nb_point} className="bg-[#CF4500] text-white border-[#CF4500] hover:bg-[#b53d00]">Rembourser</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-[#CF4500]/8 rounded-[16px] text-sm text-[#CF4500]">Vous n'avez pas de points pour rembourser vos dettes. Jouez pour en gagner ou vendez vos actions.</div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mt-6">
+              <Wallet className="w-6 h-6 text-[#141413]" />
+              <div>
+                <h3 className="text-xl font-medium tracking-[-0.03em] text-[#141413]">Aucune dette</h3>
+                <p className="text-sm text-[#696969]">Vous n'avez pas de dettes a rembourser. Continuez comme ca.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

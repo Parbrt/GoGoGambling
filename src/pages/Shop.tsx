@@ -56,6 +56,60 @@ const RARITY_LABELS: Record<string, string> = {
 
 const RARITY_ORDER = ["unique", "exotic", "mythic", "legendary", "epic", "rare", "common"];
 
+const RARITY_FLASH_COLORS: Record<string, string> = {
+  unique: "#FFD700",
+  exotic: "#FF4444",
+  mythic: "#E879F9",
+  legendary: "#FB923C",
+  epic: "#C084FC",
+  rare: "#60A5FA",
+  common: "#F8F8F8",
+};
+
+const RARITY_OVERLAY_TINT: Record<string, string> = {
+  unique: "rgba(255,215,0,0.08)",
+  exotic: "rgba(248,113,113,0.08)",
+  mythic: "rgba(232,121,249,0.09)",
+  legendary: "rgba(251,146,60,0.08)",
+  epic: "rgba(192,132,252,0.09)",
+  rare: "rgba(96,165,250,0.08)",
+  common: "rgba(0,0,0,0)",
+};
+
+const RARITY_PARTICLE_COLORS: Record<string, string[]> = {
+  unique:    ["#FFD700", "#FFC107", "#FBBF24", "#FF6B00", "#FF4444", "#FFE566"],
+  exotic:    ["#FF4444", "#EF4444", "#DC2626", "#FF6B6B", "#FF8C8C"],
+  mythic:    ["#E879F9", "#D946EF", "#A21CAF", "#F0ABFC", "#C084FC"],
+  legendary: ["#FB923C", "#F97316", "#FFD700", "#CF4500", "#FF8C00"],
+  epic:      ["#C084FC", "#A855F7", "#7C3AED", "#E879F9", "#9333EA"],
+  rare:      ["#3860BE", "#60A5FA", "#93BBFF", "#2244AA", "#4080FF"],
+  common:    ["#D1CDC7", "#9A9A9A", "#BCBCBC"],
+};
+
+const RARITY_PARTICLE_COUNT: Record<string, number> = {
+  unique: 90, exotic: 65, mythic: 72, legendary: 55, epic: 44, rare: 28, common: 10,
+};
+
+const RARITY_CARD_INITIAL: Record<string, object> = {
+  common:    { scale: 0.85, opacity: 0 },
+  rare:      { scale: 0.72, y: 32, opacity: 0 },
+  epic:      { scale: 0.6, rotate: -8, opacity: 0 },
+  legendary: { scale: 0.45, rotate: 12, opacity: 0 },
+  mythic:    { scale: 0.3, rotate: -16, opacity: 0 },
+  exotic:    { scale: 0.3, y: -40, rotate: 8, opacity: 0 },
+  unique:    { scale: 0.1, opacity: 0 },
+};
+
+const RARITY_CARD_SPRING: Record<string, object> = {
+  common:    { type: "spring", stiffness: 280, damping: 24 },
+  rare:      { type: "spring", stiffness: 300, damping: 20 },
+  epic:      { type: "spring", stiffness: 320, damping: 18 },
+  legendary: { type: "spring", stiffness: 340, damping: 16 },
+  mythic:    { type: "spring", stiffness: 360, damping: 14 },
+  exotic:    { type: "spring", stiffness: 350, damping: 15 },
+  unique:    { type: "spring", stiffness: 190, damping: 12 },
+};
+
 const BOX_GRADIENTS: Record<string, string> = {
   GAMBLINGBOX: "linear-gradient(135deg, #FFD700 0%, #CF4500 100%)",
   GOGOBOX: "linear-gradient(135deg, #F37338 0%, #9A3A0A 100%)",

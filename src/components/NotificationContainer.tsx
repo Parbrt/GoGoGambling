@@ -1,5 +1,5 @@
 import { useNotifications } from "@/context/NotificationContext";
-import { X, Trophy, TrendingDown, TrendingUp, AlertCircle, Gift, Info } from "lucide-react";
+import { X, Trophy, TrendingDown, TrendingUp, AlertCircle, Gift, Info, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const icons = {
@@ -9,6 +9,7 @@ const icons = {
   error: TrendingDown,
   jackpot: Gift,
   ranking: Trophy,
+  marketplace: ShoppingBag,
 };
 
 const styles = {
@@ -18,6 +19,7 @@ const styles = {
   error: "bg-[#FCFBFA] border-[#CF4500]/40 text-[#141413]",
   jackpot: "bg-[#141413] border-[#141413] text-[#F3F0EE]",
   ranking: "bg-[#FCFBFA] border-[#F37338]/40 text-[#141413]",
+  marketplace: "bg-[#FCFBFA] border-[#3860BE]/40 text-[#141413]",
 };
 
 const iconColors = {
@@ -27,6 +29,7 @@ const iconColors = {
   error: "text-[#CF4500]",
   jackpot: "text-[#F37338]",
   ranking: "text-[#F37338]",
+  marketplace: "text-[#3860BE]",
 };
 
 export function NotificationContainer() {

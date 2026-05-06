@@ -34,6 +34,7 @@ import { NotificationContainer } from "@/components/NotificationContainer";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
 import { useBlackjackNotifications } from "@/hooks/useBlackjackNotifications";
+import { useMarketplaceNotifications } from "@/hooks/useMarketplaceNotifications";
 
 const INIT_TIMEOUT = 3000;
 
@@ -46,6 +47,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
   useAutoNotifications({ currentUserId: user.id, currentPlayer: player });
   useGlobalNotifications({ currentUserId: user.id, currentPlayerName: player.player_name });
   useBlackjackNotifications({ currentUserId: user.id });
+  useMarketplaceNotifications({ currentUserId: user.id });
 
   useEffect(() => {
     api.player.setOnline().catch(console.error);

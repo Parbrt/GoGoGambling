@@ -96,6 +96,7 @@ export interface MarketplaceListing {
   star_level: number;
   quantity: number;
   price: number;
+  status: string;
   created_at: string;
   // joined fields
   seller_name?: string;

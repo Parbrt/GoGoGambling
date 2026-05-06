@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 
-export type NotificationType = "info" | "success" | "warning" | "error" | "jackpot" | "ranking";
+export type NotificationType = "info" | "success" | "warning" | "error" | "jackpot" | "ranking" | "marketplace";
 
 export interface Notification {
   id: string;

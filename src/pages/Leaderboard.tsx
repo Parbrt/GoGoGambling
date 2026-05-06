@@ -242,7 +242,7 @@ function SatelliteBadge({
       whileHover={{ scale: 1.06 }}
       transition={{ type: "spring", stiffness: 400, damping: 20 }}
     >
-      <span className="text-sm leading-none">{emoji}</span>
+      {type === "object" && <span className="text-sm leading-none">{emoji}</span>}
       <span className={`text-[10px] font-bold uppercase tracking-[0.03em] ${color}`}>{name}</span>
     </motion.div>
   );

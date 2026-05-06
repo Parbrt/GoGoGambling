@@ -265,7 +265,8 @@ export function Inventory() {
             <p className="text-sm text-[#D1CDC7]">Ouvrez des box dans le shop pour obtenir des objets !</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          <div className="max-h-[32rem] overflow-y-auto rounded-xl pt-2 pl-2 pr-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {displayItems.map((item) => {
               const style = RARITY_STYLES[item.rarity] || RARITY_STYLES.common;
               const isEquippedTitle = equipped.equipped_title?.id === item.id;
@@ -367,6 +368,7 @@ export function Inventory() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
       </div>

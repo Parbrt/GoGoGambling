@@ -49,8 +49,26 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       req.userId!
     );
 
-    // Roll the item
-    const { item: rolledItem, rolledRarity } = rollBoxItem(boxType as BoxType);
+    // Get names of unique items already owned by any player (globally unique)
+    const ownedUniques = db
+      .prepare(
+        `SELECT ic.name FROM player_inventory pi
+         JOIN items_catalog ic ON pi.item_id = ic.id
+         WHERE ic.rarity = 'unique' AND pi.quantity > 0`
+      )
+      .all() as { name: string }[];
+    const excludeNames = ownedUniques.map((u) => u.name);
+
+    // Roll the item (excluding already-owned unique items)
+    const { item: rolledItem, rolledRarity } = rollBoxItem(
+      boxType as BoxType,
+      excludeNames
+    );
+
+    if (rolledRarity === null || !rolledItem) {
+      res.status(500).json({ error: "Plus aucun item disponible dans cette rareté" });
+      return;
+    }
 
     // Fetch the catalog item from DB (to get its ID)
     const catalogItem = db
@@ -162,7 +180,7 @@ router.get("/inventory", authMiddleware, (req: AuthenticatedRequest, res) => {
                 ic.qualifyable, ic.emoji, ic.description
          FROM player_inventory pi
          JOIN items_catalog ic ON pi.item_id = ic.id
-         WHERE pi.user_id = ?
+         WHERE pi.user_id = ? AND pi.quantity > 0
          ORDER BY
            CASE ic.rarity
              WHEN 'unique' THEN 0
@@ -420,6 +438,15 @@ router.post("/marketplace/list", authMiddleware, (req: AuthenticatedRequest, res
       return;
     }
 
+    // Block listing unique items on marketplace
+    const itemCat = db
+      .prepare("SELECT rarity FROM items_catalog WHERE id = ?")
+      .get(source.item_id) as { rarity: string } | undefined;
+    if (itemCat?.rarity === "unique") {
+      res.status(400).json({ error: "Les objets uniques ne peuvent pas être vendus sur le marché" });
+      return;
+    }
+
     if (source.quantity < quantity) {
       res.status(400).json({
         error: `Vous n'avez que ${source.quantity} exemplaire(s).`,
@@ -427,16 +454,12 @@ router.post("/marketplace/list", authMiddleware, (req: AuthenticatedRequest, res
       return;
     }
 
-    // Deduct from inventory
+    // Deduct from inventory — keep row alive with quantity 0 to preserve FK
     const newQuantity = source.quantity - quantity;
-    if (newQuantity <= 0) {
-      db.prepare("DELETE FROM player_inventory WHERE id = ?").run(inventoryId);
-    } else {
-      db.prepare("UPDATE player_inventory SET quantity = ? WHERE id = ?").run(
-        newQuantity,
-        inventoryId
-      );
-    }
+    db.prepare("UPDATE player_inventory SET quantity = ? WHERE id = ?").run(
+      Math.max(0, newQuantity),
+      inventoryId
+    );
 
     // Create listing
     const result = db
@@ -465,6 +488,7 @@ router.get("/marketplace/listings", (_req, res) => {
          FROM marketplace_listings ml
          JOIN players p ON ml.seller_user_id = p.user_id
          JOIN items_catalog ic ON ml.item_id = ic.id
+         WHERE ml.status = 'active'
          ORDER BY ml.created_at DESC
          LIMIT 100`
       )
@@ -529,10 +553,22 @@ router.post("/marketplace/buy", authMiddleware, (req: AuthenticatedRequest, res)
       listing.seller_user_id
     );
 
-    // Delete listing
-    db.prepare("DELETE FROM marketplace_listings WHERE id = ?").run(listingId);
+    // Record transaction BEFORE updating listing status
+    db.prepare(
+      `INSERT INTO marketplace_transactions (buyer_user_id, seller_user_id, listing_id, item_id, star_level, quantity, price)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      buyerUserId,
+      listing.seller_user_id,
+      listingId,
+      listing.item_id,
+      listing.star_level,
+      listing.quantity,
+      listing.price
+    );
 
-    // Add item to buyer's inventory
+    // Mark listing as sold
+    db.prepare("UPDATE marketplace_listings SET status = 'sold' WHERE id = ?").run(listingId);
     const existing = db
       .prepare(
         "SELECT id FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = ?"
@@ -549,20 +585,6 @@ router.post("/marketplace/buy", authMiddleware, (req: AuthenticatedRequest, res)
         "INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, ?, ?)"
       ).run(buyerUserId, listing.item_id, listing.quantity, listing.star_level);
     }
-
-    // Record transaction
-    db.prepare(
-      `INSERT INTO marketplace_transactions (buyer_user_id, seller_user_id, listing_id, item_id, star_level, quantity, price)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      buyerUserId,
-      listing.seller_user_id,
-      listingId,
-      listing.item_id,
-      listing.star_level,
-      listing.quantity,
-      listing.price
-    );
 
     updatePeakNetWorth(buyerUserId);
     updatePeakNetWorth(listing.seller_user_id);
@@ -592,8 +614,8 @@ router.post("/marketplace/cancel", authMiddleware, (req: AuthenticatedRequest, r
       return;
     }
 
-    // Remove listing
-    db.prepare("DELETE FROM marketplace_listings WHERE id = ?").run(listingId);
+    // Mark listing as cancelled
+    db.prepare("UPDATE marketplace_listings SET status = 'cancelled' WHERE id = ?").run(listingId);
 
     // Return item to inventory
     const existing = db
@@ -704,8 +726,23 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       return;
     }
 
+    // Get names of unique items already owned by any player
+    const ownedUniques = db
+      .prepare(
+        `SELECT ic.name FROM player_inventory pi
+         JOIN items_catalog ic ON pi.item_id = ic.id
+         WHERE ic.rarity = 'unique' AND pi.quantity > 0`
+      )
+      .all() as { name: string }[];
+    const excludeNames = ownedUniques.map((u) => u.name);
+
     // Open a free XBOX
-    const { item: rolledItem, rolledRarity } = rollBoxItem("XBOX");
+    const { item: rolledItem, rolledRarity } = rollBoxItem("XBOX", excludeNames);
+
+    if (rolledRarity === null || !rolledItem) {
+      res.status(500).json({ error: "Plus aucun item disponible" });
+      return;
+    }
 
     const catalogItem = db
       .prepare("SELECT * FROM items_catalog WHERE name = ? AND category = ?")

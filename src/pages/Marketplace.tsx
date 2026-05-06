@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2, Search, ShoppingCart, Tag, History, Plus, X, Star, ArrowUpRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/lib/api";
+import { useNotifications } from "@/context/NotificationContext";
 import { Button } from "@/components/ui/button";
 import type { PlayerType } from "@/types";
 
@@ -90,6 +91,7 @@ const springGentle = { type: "spring" as const, stiffness: 200, damping: 24 };
 // ─── Component ───
 
 export function Marketplace({ player, onPlayerUpdate }: MarketplacePageProps) {
+  const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<TabKey>("buy");
   const [listings, setListings] = useState<Listing[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -159,7 +161,7 @@ export function Marketplace({ player, onPlayerUpdate }: MarketplacePageProps) {
   // ─── Sellable inventory ───
 
   const sellableInventory = useMemo(() => {
-    return inventory.filter((i) => ["fruit", "burger", "people", "loto_ticket"].includes(i.category));
+    return inventory.filter((i) => ["fruit", "burger", "people", "loto_ticket", "title"].includes(i.category));
   }, [inventory]);
 
   // ─── Actions ───
@@ -185,6 +187,12 @@ export function Marketplace({ player, onPlayerUpdate }: MarketplacePageProps) {
     setActing(true);
     try {
       await api.shop.marketplace.list(sellItem.id, sellQuantity, sellPrice);
+      addNotification({
+        type: "marketplace",
+        title: "Article mis en vente",
+        message: `${sellItem.emoji} ${sellItem.name} x${sellQuantity} mis en vente pour ${(sellPrice * sellQuantity).toLocaleString()} pts`,
+        duration: 6000,
+      });
       setSellItem(null);
       setSellQuantity(1);
       setSellPrice(0);
@@ -199,7 +207,16 @@ export function Marketplace({ player, onPlayerUpdate }: MarketplacePageProps) {
   async function handleCancel(listingId: number) {
     setActing(true);
     try {
+      const listing = myListings.find((l) => l.id === listingId);
       await api.shop.marketplace.cancel(listingId);
+      if (listing) {
+        addNotification({
+          type: "marketplace",
+          title: "Annonce retiree",
+          message: `${listing.item_emoji} ${listing.item_name} a ete retire de la vente`,
+          duration: 5000,
+        });
+      }
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'annulation");
