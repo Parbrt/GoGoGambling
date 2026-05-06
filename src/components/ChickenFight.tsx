@@ -21,7 +21,7 @@ interface ChickenFightProps {
 type GamePhase = "betting" | "fighting" | "result";
 
 const MAX_CHARGES = 5;
-const CHARGE_COOLDOWN_MS = 10 * 60 * 1000;
+const CHARGE_COOLDOWN_MS = 5 * 60 * 1000;
 
 function calcNextChargeMs(charges: number, lastRefill: string | null): number {
   if (charges >= MAX_CHARGES || !lastRefill) return 0;

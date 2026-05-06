@@ -201,7 +201,7 @@ router.post("/roulette/spin", authMiddleware, (req: AuthenticatedRequest, res) =
 // --- Chicken Fight ---
 
 const CHICKEN_CHARGE_MAX = 5;
-const CHICKEN_CHARGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+const CHICKEN_CHARGE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
 function refillChickenCharges(player: Player): { chicken_charges: number; last_chicken_charge_refill: string | null } {
   let charges = player.chicken_charges ?? CHICKEN_CHARGE_MAX;
