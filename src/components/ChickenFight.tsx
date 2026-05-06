@@ -13,8 +13,7 @@ interface ChickenFightProps {
   currentPoints: number;
   initialCharges?: number;
   initialLastChargeRefill?: string | null;
-  onPointsUpdate: (newPoints: number) => void;
-  onChargesUpdate?: (charges: number, lastRefill: string | null) => void;
+  onPlayerUpdate: (player: { nb_point: number; chicken_charges: number; last_chicken_charge_refill: string | null }) => void;
 }
 
 type GamePhase = "betting" | "fighting" | "result";
@@ -30,7 +29,7 @@ function calcNextChargeMs(charges: number, lastRefill: string | null): number {
   return Math.max(0, remaining);
 }
 
-export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, onPointsUpdate, onChargesUpdate }: ChickenFightProps) {
+export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, onPlayerUpdate }: ChickenFightProps) {
   const [chickenA, setChickenA] = useState<number[]>(createChicken);
   const [chickenB, setChickenB] = useState<number[]>(createChicken);
   const [betAmount, setBetAmount] = useState<number>(0);
@@ -55,13 +54,15 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
   // Timer for charge refill countdown
   const chargesRef = useRef(charges);
   const lastChargeRefillRef = useRef(lastChargeRefill);
-  const onChargesUpdateRef = useRef(onChargesUpdate);
+  const currentPointsRef = useRef(currentPoints);
+  const onPlayerUpdateRef = useRef(onPlayerUpdate);
 
   // Sync refs after render (avoid accessing refs during render)
   useEffect(() => {
     chargesRef.current = charges;
     lastChargeRefillRef.current = lastChargeRefill;
-    onChargesUpdateRef.current = onChargesUpdate;
+    currentPointsRef.current = currentPoints;
+    onPlayerUpdateRef.current = onPlayerUpdate;
   });
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
           const finalLastRefill = newCharges >= MAX_CHARGES ? new Date().toISOString() : newLastRefill;
           setCharges(newCharges);
           setLastChargeRefill(finalLastRefill);
-          onChargesUpdateRef.current?.(newCharges, finalLastRefill);
+          onPlayerUpdateRef.current?.({ nb_point: currentPointsRef.current, chicken_charges: newCharges, last_chicken_charge_refill: finalLastRefill });
         }
       }
     };
@@ -144,8 +145,11 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
       setCharges(result.chicken_charges);
       setNextChargeMs(result.next_charge_in_ms);
       setLastChargeRefill(result.player.last_chicken_charge_refill ?? null);
-      onPointsUpdate(result.player.nb_point);
-      onChargesUpdate?.(result.chicken_charges, result.player.last_chicken_charge_refill ?? null);
+      onPlayerUpdate({
+        nb_point: result.player.nb_point,
+        chicken_charges: result.chicken_charges,
+        last_chicken_charge_refill: result.player.last_chicken_charge_refill ?? null,
+      });
       setPhase("result");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur");

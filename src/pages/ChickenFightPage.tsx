@@ -23,8 +23,7 @@ export function ChickenFightPage({ userId, player, onPlayerUpdate }: ChickenFigh
         currentPoints={player.nb_point}
         initialCharges={player.chicken_charges ?? 5}
         initialLastChargeRefill={player.last_chicken_charge_refill ?? null}
-        onPointsUpdate={(newPoints) => onPlayerUpdate({ ...player, nb_point: newPoints })}
-        onChargesUpdate={(charges, lastRefill) => onPlayerUpdate({ ...player, chicken_charges: charges, last_chicken_charge_refill: lastRefill })}
+        onPlayerUpdate={(updated) => onPlayerUpdate({ ...player, ...updated })}
       />
 
       <Card className="bg-primary/5 border-primary/20">
