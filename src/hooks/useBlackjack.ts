@@ -31,6 +31,8 @@ interface RawTable {
     currentPlayerSeat?: number | null;
     turnDeadline?: number;
     roundDeadline?: number;
+    pendingChoices?: Record<string, "hit" | "stand">;
+    roundCount?: number;
   };
   round_number: number;
 }
@@ -70,6 +72,8 @@ function buildTableState(table: RawTable, players: RawPlayer[]): TableState {
     deckRemaining: (phaseData.deck || []).length,
     turnDeadline: phaseData.turnDeadline ?? 0,
     roundDeadline: phaseData.roundDeadline ?? 0,
+    pendingChoices: phaseData.pendingChoices ?? {},
+    roundCount: phaseData.roundCount ?? 0,
   };
 }
 

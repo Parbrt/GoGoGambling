@@ -159,19 +159,14 @@ function persistSnapshot(): void {
   const now = new Date().toISOString();
   const timeNow = Math.floor(Date.now() / 1000);
 
-  const latest = db
-    .prepare("SELECT id FROM shares ORDER BY time_now DESC LIMIT 1")
-    .get() as { id: number } | undefined;
+  db.prepare(
+    "INSERT INTO shares (value_share_A, value_share_B, time_now, time_update) VALUES (?, ?, ?, ?)"
+  ).run(priceA, priceB, timeNow, now);
 
-  if (latest) {
-    db.prepare(
-      "UPDATE shares SET value_share_A = ?, value_share_B = ?, time_now = ?, time_update = ? WHERE id = ?"
-    ).run(priceA, priceB, timeNow, now, latest.id);
-  } else {
-    db.prepare(
-      "INSERT INTO shares (value_share_A, value_share_B, time_now, time_update) VALUES (?, ?, ?, ?)"
-    ).run(priceA, priceB, timeNow, now);
-  }
+  // Nettoyer les vieux snapshots (garder les 1000 derniers)
+  db.prepare(
+    "DELETE FROM shares WHERE id NOT IN (SELECT id FROM shares ORDER BY time_now DESC LIMIT 1000)"
+  ).run();
 }
 
 export function startShareEngine(): void {

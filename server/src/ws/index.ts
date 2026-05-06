@@ -61,6 +61,13 @@ export function setupWebSocket(server: Server): WebSocketServer {
             const msg = JSON.parse(raw.toString());
             if (msg.type === "ping") {
               ws.send(JSON.stringify({ type: "pong" }));
+            } else if (msg.type === "baby_fight:get_state") {
+              import("../engine/babyFightEngine.js").then(({ getCurrentFight }) => {
+                const state = getCurrentFight();
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: "baby_fight:state", data: state }));
+                }
+              });
             }
           } catch {
             // Ignore invalid messages
@@ -89,6 +96,15 @@ export function broadcastJackpotWin(winner: string, amount: number): void {
     type: "jackpot_win",
     data: { winner, amount, timestamp: Date.now() },
   });
+  for (const [, client] of connectedClients) {
+    if (client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(message);
+    }
+  }
+}
+
+export function broadcastBabyFight(type: string, data: unknown): void {
+  const message = JSON.stringify({ type, data });
   for (const [, client] of connectedClients) {
     if (client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(message);

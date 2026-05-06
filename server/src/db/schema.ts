@@ -29,6 +29,8 @@ export function initSchema(): void {
       time_update TEXT NOT NULL
     );
 
+    CREATE INDEX IF NOT EXISTS idx_shares_time_now ON shares(time_now);
+
     CREATE TABLE IF NOT EXISTS slot_machine (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nb_point INTEGER NOT NULL DEFAULT 10000,
@@ -44,6 +46,48 @@ export function initSchema(): void {
 
   // Migrate: add last_seen column for existing databases
   migrateLastSeenColumn(db);
+
+  // Migrate: add peak_net_worth column for existing databases
+  migratePeakNetWorthColumn(db);
+
+  // Create baby fight tables
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS baby_fights (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      baby_a_name TEXT NOT NULL,
+      baby_b_name TEXT NOT NULL,
+      baby_a_stats TEXT NOT NULL,
+      baby_b_stats TEXT NOT NULL,
+      scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'betting',
+      winner INTEGER,
+      total_pot_a INTEGER NOT NULL DEFAULT 0,
+      total_pot_b INTEGER NOT NULL DEFAULT 0,
+      odds_a REAL NOT NULL DEFAULT 1.0,
+      odds_b REAL NOT NULL DEFAULT 1.0,
+      bet_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      resolved_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS baby_fight_bets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fight_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      bet_on INTEGER NOT NULL,
+      amount INTEGER NOT NULL,
+      odds_at_bet REAL NOT NULL,
+      won INTEGER,
+      winnings INTEGER,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (fight_id) REFERENCES baby_fights(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_baby_fights_status ON baby_fights(status);
+    CREATE INDEX IF NOT EXISTS idx_baby_fights_scheduled ON baby_fights(scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_baby_fight_bets_fight ON baby_fight_bets(fight_id);
+  `);
 
   // Reset stale online status on server startup
   resetOnlineStatus(db);
@@ -99,6 +143,14 @@ function migrateLastSeenColumn(db: ReturnType<typeof getDb>): void {
   if (!info.find(c => c.name === "last_seen")) {
     db.prepare("ALTER TABLE players ADD COLUMN last_seen TEXT").run();
     console.log("[schema] Added last_seen column");
+  }
+}
+
+function migratePeakNetWorthColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "peak_net_worth")) {
+    db.prepare("ALTER TABLE players ADD COLUMN peak_net_worth INTEGER NOT NULL DEFAULT 0").run();
+    console.log("[schema] Added peak_net_worth column");
   }
 }
 

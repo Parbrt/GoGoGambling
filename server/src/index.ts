@@ -13,7 +13,9 @@ import { startShareEngine } from "./engine/shareEngine.js";
 import playerRoutes from "./routes/player.js";
 import sharesRoutes from "./routes/shares.js";
 import gamesRoutes from "./routes/games.js";
+import babyFightRoutes from "./routes/babyFight.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
+import { scheduleFights } from "./engine/babyFightEngine.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 
@@ -29,6 +31,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use("/api/player", playerRoutes);
 app.use("/api/shares", sharesRoutes);
 app.use("/api/games", gamesRoutes);
+app.use("/api/games/baby-fight", babyFightRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 
 // Health check
@@ -41,6 +44,9 @@ initSchema();
 
 // Start share engine
 startShareEngine();
+
+// Start baby fight scheduler
+scheduleFights();
 
 // HTTP server
 const httpServer = createServer(app);

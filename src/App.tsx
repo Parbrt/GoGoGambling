@@ -1,6 +1,12 @@
 import "./index.css";
 import { useState, useEffect, useCallback } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { Home } from "@/pages/Home";
@@ -8,6 +14,7 @@ import { Trading } from "@/pages/Trading";
 import { Games } from "@/pages/Games";
 import { Leaderboard } from "@/pages/Leaderboard";
 import { ChickenFightPage } from "@/pages/ChickenFightPage";
+import { BabyFightPage } from "@/pages/BabyFightPage";
 import { RoulettePage } from "@/pages/RoulettePage";
 import { SlotMachinePage } from "@/pages/SlotMachinePage";
 import { BlackjackPage } from "@/pages/BlackjackPage";
@@ -64,8 +71,12 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
     };
   }, [user.id]);
 
+  const location = useLocation();
+  const isGamePage = location.pathname.startsWith("/games/");
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <ScrollToTop />
       <NotificationContainer />
       <Header playerName={player.player_name} onLogout={handleLogout} />
       <main className="flex-1">
@@ -74,6 +85,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
           <Route path="/trading" element={<Trading player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/games" element={<Games />} />
           <Route path="/games/chicken-fight" element={<ChickenFightPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/games/baby-fight" element={<BabyFightPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/games/roulette" element={<RoulettePage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/games/slot-machine" element={<SlotMachinePage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/games/blackjack" element={<BlackjackPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
@@ -82,7 +94,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      <Footer />
+      {!isGamePage && <Footer />}
     </div>
   );
 }

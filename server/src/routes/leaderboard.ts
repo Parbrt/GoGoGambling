@@ -15,12 +15,13 @@ router.get("/", (_req, res) => {
         id, user_id, player_name, nb_point, nb_debt,
         nb_share_A, avg_share_A_value, nb_share_B, avg_share_B_value,
         last_login, last_daily_reward_claim, profile_photo, last_seen,
+        peak_net_worth,
         CASE
           WHEN is_online = 1 AND last_seen > datetime('now', ?) THEN 1
           ELSE 0
         END AS is_online
       FROM players
-      ORDER BY (nb_point - nb_debt) DESC
+      ORDER BY peak_net_worth DESC
     `)
     .all(`-${HEARTBEAT_TIMEOUT_SECONDS} seconds`) as Player[];
 

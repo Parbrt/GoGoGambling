@@ -19,8 +19,9 @@ interface BlackjackTableProps {
   onLeave: () => void;
 }
 
-const BETTING_DURATION = 15;
+const BETTING_DURATION = 12;
 const TURN_DURATION = 10;
+const RESULTS_DURATION = 5;
 
 export function BlackjackTable({
   userId,
@@ -86,12 +87,10 @@ export function BlackjackTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableState?.status, tableState?.roundNumber]);
 
-  // Reset local "chosen" flag when round phase changes
+  // Reset local "chosen" flag on every new round (roundCount change) OR when leaving playing phase
   useEffect(() => {
-    if (tableState?.status !== "playing") {
-      setLocalChosen(false);
-    }
-  }, [tableState?.status, tableState?.roundNumber]);
+    setLocalChosen(false);
+  }, [tableState?.roundCount, tableState?.status]);
 
   // Timer based on server deadlines
   useEffect(() => {
@@ -261,11 +260,11 @@ export function BlackjackTable({
 
       {/* Main */}
       <div className="relative z-10 max-w-5xl mx-auto px-4 py-4 flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
-        {/* Dealer area */}
+        {/* Dealer area — fixed height so the box doesn't collapse when no cards */}
         <div className="flex flex-col items-center gap-3">
           <span className="eyebrow">Croupier</span>
           <div
-            className="px-6 py-5 rounded-[32px] bg-white border border-[#D1CDC7] shadow-[0_8px_28px_rgba(20,20,19,0.06)]"
+            className="px-6 py-5 rounded-[32px] bg-white border border-[#D1CDC7] shadow-[0_8px_28px_rgba(20,20,19,0.06)] min-h-[148px] flex items-center justify-center"
           >
             <BlackjackHand
               cards={tableState?.dealerHand || []}
@@ -379,7 +378,7 @@ export function BlackjackTable({
                 >
                   <BlackjackTimer
                     remaining={timerRemaining}
-                    total={10}
+                    total={RESULTS_DURATION}
                     label="Nouvelle manche dans"
                     variant="compact"
                   />
@@ -407,12 +406,14 @@ export function BlackjackTable({
                   }
                   hasChosen={
                     player.userId === userId
-                      ? localChosen
-                      : player.isStand || player.isBust || player.isBlackjack
+                      ? localChosen ||
+                        !!tableState?.pendingChoices?.[String(player.seat)]
+                      : !!tableState?.pendingChoices?.[String(player.seat)] ||
+                        player.isStand ||
+                        player.isBust ||
+                        player.isBlackjack
                   }
-                  showActions={
-                    player.userId === userId && showLocalActions
-                  }
+                  showActions={false}
                   onHit={handleHit}
                   onStand={handleStand}
                 />
@@ -455,6 +456,50 @@ export function BlackjackTable({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Big action buttons — fixed bottom bar when it's your turn */}
+      <AnimatePresence>
+        {showLocalActions && (
+          <motion.div
+            key="action-bar"
+            initial={{ opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 80 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-6 pt-3 bg-gradient-to-t from-[#F3F0EE] via-[#F3F0EE]/90 to-transparent"
+          >
+            {/* Round label + timer */}
+            {tableState?.roundCount !== undefined && tableState.roundCount > 0 && (
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#696969]">
+                  Round {tableState.roundCount}
+                </span>
+                {timerRemaining !== null && (
+                  <span className={`text-[11px] font-bold tabular-nums ${timerRemaining <= 3 ? "text-[#CF4500]" : "text-[#F37338]"}`}>
+                    · {timerRemaining}s
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="flex gap-3 max-w-sm mx-auto">
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={handleHit}
+                className="flex-1 py-4 rounded-2xl bg-[#141413] text-white text-base font-bold tracking-[-0.02em] shadow-[0_8px_24px_rgba(20,20,19,0.18)] active:shadow-none transition-shadow"
+              >
+                + Carte
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={handleStand}
+                className="flex-1 py-4 rounded-2xl bg-[#CF4500] text-white text-base font-bold tracking-[-0.02em] shadow-[0_8px_24px_rgba(207,69,0,0.25)] active:shadow-none transition-shadow"
+              >
+                Stop
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Discrete result */}
       <BlackjackResult

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { broadcastJackpotWin } from "../ws/index.js";
+import { updatePeakNetWorth } from "./player.js";
 import type { Player } from "../types.js";
 
 const router = Router();
@@ -114,6 +115,8 @@ router.post("/slot/spin", authMiddleware, (req: AuthenticatedRequest, res) => {
   db.prepare("UPDATE slot_machine SET nb_point = ?, updated_at = ? WHERE id = COALESCE((SELECT id FROM slot_machine LIMIT 1), 1)")
     .run(finalMachinePoints, new Date().toISOString());
 
+  updatePeakNetWorth(req.userId!);
+
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
     .get(req.userId!) as Player;
@@ -180,6 +183,8 @@ router.post("/roulette/spin", authMiddleware, (req: AuthenticatedRequest, res) =
 
   const newPoints = Math.round(player.nb_point - bet + winnings);
   db.prepare("UPDATE players SET nb_point = ? WHERE user_id = ?").run(newPoints, req.userId!);
+
+  updatePeakNetWorth(req.userId!);
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
@@ -285,6 +290,8 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
   const newPoints = Math.round(player.nb_point - bet + winnings);
 
   db.prepare("UPDATE players SET nb_point = ? WHERE user_id = ?").run(newPoints, req.userId!);
+
+  updatePeakNetWorth(req.userId!);
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")

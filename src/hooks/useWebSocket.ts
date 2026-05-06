@@ -18,10 +18,24 @@ interface JackpotWin {
   timestamp: number;
 }
 
+interface BabyFightWSMessage {
+  fightId?: number;
+  playerName?: string;
+  amount?: number;
+  betOn?: number;
+  oddsA?: number;
+  oddsB?: number;
+  potA?: number;
+  potB?: number;
+  betCount?: number;
+  [key: string]: unknown;
+}
+
 type WSCallback = {
   onPriceUpdate?: (data: PriceUpdate) => void;
   onJackpotUpdate?: (data: JackpotUpdate) => void;
   onJackpotWin?: (data: JackpotWin) => void;
+  onBabyFight?: (type: string, data: BabyFightWSMessage) => void;
 };
 
 // Singleton WebSocket manager
@@ -60,6 +74,13 @@ function connectWebSocket() {
               case "jackpot_win":
                 cb.onJackpotWin?.(msg.data);
                 break;
+              case "baby_fight:bet":
+              case "baby_fight:new":
+              case "baby_fight:fight_start":
+              case "baby_fight:result":
+              case "baby_fight:state":
+                cb.onBabyFight?.(msg.type, msg.data);
+                break;
             }
           }
         } catch { /* ignore */ }
@@ -89,6 +110,7 @@ export function useWebSocket(callbacks: WSCallback = {}) {
       onPriceUpdate: (data) => callbacksRef.current.onPriceUpdate?.(data),
       onJackpotUpdate: (data) => callbacksRef.current.onJackpotUpdate?.(data),
       onJackpotWin: (data) => callbacksRef.current.onJackpotWin?.(data),
+      onBabyFight: (type, data) => callbacksRef.current.onBabyFight?.(type, data),
     };
 
     globalCallbacks.add(proxy);

@@ -42,6 +42,8 @@ export interface TableState {
   deckRemaining: number;
   turnDeadline: number;
   roundDeadline: number;
+  pendingChoices: Record<string, "hit" | "stand">;
+  roundCount: number;
 }
 
 export function cardValue(rank: Rank): number {

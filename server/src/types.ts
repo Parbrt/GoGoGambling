@@ -13,6 +13,7 @@ export interface Player {
   is_online: boolean;
   last_seen: string | null;
   profile_photo: string | null;
+  peak_net_worth: number;
 }
 
 export interface ShareSnapshot {

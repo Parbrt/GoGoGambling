@@ -68,7 +68,7 @@ export function BlackjackPlayerSpot({
       exit={{ opacity: 0, y: -10, scale: 0.95 }}
       layout
       transition={{ type: "spring", stiffness: 260, damping: 24 }}
-      className={`relative flex flex-col items-center gap-2.5 px-3 pt-3 pb-3 rounded-3xl bg-white ${ringClass} min-w-[150px] max-w-[180px] shadow-[0_4px_20px_rgba(20,20,19,0.06)]`}
+      className={`relative flex flex-col items-center gap-3 px-4 pt-4 pb-4 rounded-3xl bg-white ${ringClass} min-w-[170px] max-w-[210px] shadow-[0_4px_20px_rgba(20,20,19,0.06)]`}
     >
       {/* Pulse halo when current player (turn-based) */}
       {turnBasedActive && (
@@ -135,7 +135,7 @@ export function BlackjackPlayerSpot({
       {player.hand.length > 0 && player.result !== "left" && (
         <BlackjackHand
           cards={player.hand}
-          size={isLocalPlayer ? "md" : "sm"}
+          size="md"
           score={player.score || undefined}
           scoreTone={scoreTone}
         />

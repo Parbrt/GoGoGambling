@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { getRankInfo } from "@/lib/ranks";
+import { PlayerCard } from "@/components/PlayerCard";
 import type { PlayerType } from "@/types";
 
 const POLL_INTERVAL = 10000;
@@ -52,6 +54,7 @@ function useLeaderboardData() {
 
 export function Leaderboard() {
   const { players, loading, error } = useLeaderboardData();
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
 
   if (loading) {
     return (
@@ -75,6 +78,10 @@ export function Leaderboard() {
   const rest = players.slice(3);
 
   return (
+    <>
+    {selectedPlayerId !== null && (
+      <PlayerCard playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+    )}
     <div className="relative max-w-5xl mx-auto px-6 py-16 md:py-24 space-y-20">
       <section className="relative">
         <div aria-hidden className="ghost-headline absolute -top-6 -right-2 text-[120px] md:text-[180px] select-none">rank.</div>
@@ -87,7 +94,7 @@ export function Leaderboard() {
 
       {podium.length > 0 && (
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-          {podium.map((p, i) => <PodiumCard key={p.id} player={p} rank={i + 1} />)}
+          {podium.map((p, i) => <PodiumCard key={p.id} player={p} rank={i + 1} onNameClick={() => setSelectedPlayerId(p.id)} />)}
         </section>
       )}
 
@@ -95,7 +102,9 @@ export function Leaderboard() {
         <section className="space-y-6">
           <span className="eyebrow">Suivants</span>
           <div className="rounded-[40px] border border-[#D1CDC7] bg-[#FCFBFA] divide-y divide-[#D1CDC7] overflow-hidden halo-soft">
-            {rest.map((p, i) => (
+            {rest.map((p, i) => {
+              const rankInfo = getRankInfo(p.peak_net_worth ?? 0);
+              return (
               <div key={p.id} className="flex items-center justify-between px-6 md:px-8 py-5 hover:bg-[#F3F0EE] transition-colors">
                 <div className="flex items-center gap-5 min-w-0">
                   <span className="text-2xl font-medium tracking-[-0.03em] text-[#696969] tabular-nums w-10">#{i + 4}</span>
@@ -114,7 +123,13 @@ export function Leaderboard() {
                     </div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-[#141413] tracking-[-0.02em] truncate">{p.player_name}</p>
+                    <button
+                      onClick={() => setSelectedPlayerId(p.id)}
+                      className="font-medium text-[#141413] tracking-[-0.02em] truncate hover:text-[#9A3A0A] transition-colors cursor-pointer"
+                    >
+                      {p.player_name}
+                    </button>
+                    <p className="text-[11px] text-[#696969] tracking-[-0.01em]">{rankInfo.title} — Niv.{rankInfo.level}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -124,15 +139,16 @@ export function Leaderboard() {
                   <span className="text-xs uppercase tracking-[0.08em] text-[#696969] hidden sm:inline">pts</span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
     </div>
-  );
+    </>);
 }
 
-function PodiumCard({ player, rank }: { player: PlayerType; rank: number }) {
+function PodiumCard({ player, rank, onNameClick }: { player: PlayerType; rank: number; onNameClick: () => void }) {
   const tones = [
     { gradient: "linear-gradient(135deg, #F4E1C9 0%, #CF4500 100%)", label: "Or" },
     { gradient: "linear-gradient(135deg, #E5DCD2 0%, #9A3A0A 100%)", label: "Argent" },
@@ -140,6 +156,7 @@ function PodiumCard({ player, rank }: { player: PlayerType; rank: number }) {
   ];
   const tone = tones[rank - 1];
   const offset = rank === 1 ? "" : rank === 2 ? "md:translate-y-8" : "md:translate-y-4";
+  const rankInfo = getRankInfo(player.peak_net_worth ?? 0);
 
   return (
     <div className={`relative ${offset}`}>
@@ -167,7 +184,13 @@ function PodiumCard({ player, rank }: { player: PlayerType; rank: number }) {
       </div>
       <div className="mt-6 text-center space-y-2 max-w-[260px] mx-auto">
         <span className="eyebrow justify-center">Rang #{rank}</span>
-        <h3 className="text-2xl font-medium tracking-[-0.02em] text-[#141413] truncate">{player.player_name}</h3>
+        <button
+          onClick={onNameClick}
+          className="text-2xl font-medium tracking-[-0.02em] text-[#141413] truncate hover:text-[#9A3A0A] transition-colors cursor-pointer block w-full"
+        >
+          {player.player_name}
+        </button>
+        <p className="text-xs text-[#696969] tracking-[-0.01em]">{rankInfo.title} — Niv.{rankInfo.level}</p>
         {(player.nb_share_A > 0 || player.nb_share_B > 0) && (
           <div className="flex items-center justify-center gap-1.5 flex-wrap">
             {player.nb_share_A > 0 && <span className="inline-flex text-[10px] font-medium text-[#3860BE] bg-white border border-[#3860BE]/30 rounded-[999px] px-2.5 py-0.5 tracking-[-0.02em]">{player.nb_share_A} GCC</span>}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { DailyReward } from "@/components/DailyReward";
 import { ShareChart } from "@/components/ShareChart";
+import { RankBadge } from "@/components/RankBadge";
 import type { PlayerType } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
@@ -180,6 +181,15 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
           <Stat label="Valeur actions" value={portfolio.totalValue.toFixed(0)} tone="link" />
           <Stat label="Dettes" value={player.nb_debt.toLocaleString()} tone="alert" />
           <Stat label="Patrimoine net" value={netWorth.toFixed(0)} tone={netWorth >= 0 ? "ink" : "alert"} />
+        </div>
+      </section>
+
+      <section className="relative rounded-[40px] border border-[#D1CDC7] bg-[#FCFBFA] halo-soft p-8 md:p-10 space-y-6">
+        <div className="flex items-center justify-between">
+          <span className="eyebrow">Rang</span>
+        </div>
+        <div>
+          <RankBadge peakNetWorth={player.peak_net_worth} />
         </div>
       </section>
 

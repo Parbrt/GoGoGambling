@@ -7,11 +7,11 @@ interface Game {
   description: string;
   icon: string;
   path: string;
-  tone: string; // background tone for the circular portrait
+  tone: string;
   category: string;
 }
 
-const games: Game[] = [
+const soloGames: Game[] = [
   {
     id: "chicken-fight",
     name: "Chicken Fight",
@@ -42,6 +42,19 @@ const games: Game[] = [
     tone: "linear-gradient(135deg, #F4E1C9 0%, #CF4500 100%)",
     category: "Jackpot",
   },
+];
+
+const multiGames: Game[] = [
+  {
+    id: "baby-fight",
+    name: "Baby Fight",
+    description:
+      "Deux bebes s'affrontent toutes les heures. Pariez en temps reel, les cotes evoluent avec les mises. Jusqu'a 50x.",
+    icon: "👶",
+    path: "/games/baby-fight",
+    tone: "linear-gradient(135deg, #FDE8E8 0%, #F37338 100%)",
+    category: "Combat horaire",
+  },
   {
     id: "blackjack",
     name: "Blackjack",
@@ -50,15 +63,57 @@ const games: Game[] = [
     icon: "🃏",
     path: "/games/blackjack",
     tone: "linear-gradient(135deg, #0a5c36 0%, #1a8a4a 100%)",
-    category: "Multijoueur",
+    category: "Cartes",
   },
 ];
+
+function GameCard({ game, i }: { game: Game; i: number }) {
+  return (
+    <Link
+      key={game.id}
+      to={game.path}
+      className={`group relative block ${
+        i === 1 ? "md:translate-y-10" : ""
+      }`}
+    >
+      {/* Circular portrait */}
+      <div className="relative mx-auto max-w-[280px]">
+        <div className="portrait-circle w-full">
+          <div
+            className="absolute inset-0 transition-transform duration-700 group-hover:scale-[1.04]"
+            style={{ background: game.tone }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[100px] drop-shadow-sm transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6">
+              {game.icon}
+            </span>
+          </div>
+        </div>
+        {/* Satellite CTA */}
+        <span className="satellite-cta">
+          <ArrowUpRight className="w-5 h-5" strokeWidth={2} />
+        </span>
+      </div>
+
+      {/* Eyebrow + title below */}
+      <div className="mt-8 space-y-2 text-center max-w-[280px] mx-auto">
+        <span className="eyebrow">{game.category}</span>
+        <h2 className="text-2xl font-medium tracking-[-0.02em] text-[#141413] leading-tight group-hover:text-[#9A3A0A] transition-colors">
+          {game.name}
+        </h2>
+        <p className="text-sm text-[#555555] leading-relaxed">
+          {game.description}
+        </p>
+      </div>
+    </Link>
+  );
+}
 
 export function Games() {
   return (
     <div className="relative max-w-6xl mx-auto px-6 py-20 md:py-28">
       {/* Eyebrow + title */}
-      <div className="space-y-4 mb-20 max-w-2xl">
+      <div className="space-y-4 mb-16 max-w-2xl">
         <span className="eyebrow">Jeux</span>
         <h1 className="text-5xl md:text-6xl font-medium tracking-[-0.03em] text-[#141413] leading-[1.02]">
           Une constellation
@@ -66,8 +121,7 @@ export function Games() {
           <span className="text-[#9A3A0A]">de hasard.</span>
         </h1>
         <p className="text-[#555555] text-base md:text-lg max-w-md leading-relaxed">
-          Trois expériences de pari, chacune avec son propre tempo. Choisissez
-          la trajectoire qui vous parle.
+          Pariez, tournez, affrontez. Chaque jeu a son propre tempo.
         </p>
       </div>
 
@@ -79,78 +133,53 @@ export function Games() {
         play.
       </div>
 
-      {/* Constellation grid */}
-      <div className="relative">
-        {/* Decorative orbital arcs (desktop only) */}
-        <svg
-          aria-hidden
-          className="absolute inset-0 w-full h-full hidden lg:block pointer-events-none"
-          viewBox="0 0 1200 600"
-          preserveAspectRatio="none"
-        >
-          <path
-            className="orbit-arc"
-            d="M 200 280 Q 400 80, 600 280"
-            stroke="#F37338"
-            strokeWidth="1"
-            fill="none"
-          />
-          <path
-            className="orbit-arc"
-            d="M 600 280 Q 800 480, 1000 280"
-            stroke="#F37338"
-            strokeWidth="1"
-            fill="none"
-          />
-        </svg>
-
-        <div className="relative grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-24 md:gap-y-16">
-          {games.map((game, i) => (
-            <Link
-              key={game.id}
-              to={game.path}
-              className={`group relative block ${
-                i === 1 ? "md:translate-y-12" : ""
-              } ${i === 2 ? "xl:translate-y-4" : ""} ${
-                i === 3 ? "md:translate-y-8" : ""
-              }`}
-            >
-              {/* Circular portrait */}
-              <div className="relative mx-auto max-w-[300px]">
-                <div className="portrait-circle w-full">
-                  <div
-                    className="absolute inset-0 transition-transform duration-700 group-hover:scale-[1.04]"
-                    style={{ background: game.tone }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[120px] drop-shadow-sm transition-transform duration-700 group-hover:scale-110 group-hover:-rotate-6">
-                      {game.icon}
-                    </span>
-                  </div>
-                </div>
-                {/* Satellite CTA */}
-                <span className="satellite-cta">
-                  <ArrowUpRight className="w-5 h-5" strokeWidth={2} />
-                </span>
-              </div>
-
-              {/* Eyebrow + title below */}
-              <div className="mt-8 space-y-2 text-center md:text-left max-w-[300px] mx-auto">
-                <span className="eyebrow">{game.category}</span>
-                <h2 className="text-2xl font-medium tracking-[-0.02em] text-[#141413] leading-tight group-hover:text-[#9A3A0A] transition-colors">
-                  {game.name}
-                </h2>
-                <p className="text-sm text-[#555555] leading-relaxed">
-                  {game.description}
-                </p>
-              </div>
-            </Link>
-          ))}
+      {/* Row 1: Solo / Grinding */}
+      <section className="mb-24">
+        <div className="mb-10">
+          <span className="eyebrow">Solo / Grinding</span>
+          <h2 className="text-2xl md:text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-2">
+            Jouez a votre rythme
+          </h2>
+          <p className="text-sm text-[#555555] mt-1 max-w-md">
+            Des jeux instantanes pour accumuler des points en solo.
+          </p>
         </div>
-      </div>
+
+        <div className="relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
+            {soloGames.map((game, i) => (
+              <GameCard key={game.id} game={game} i={i} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Divider */}
+      <div className="border-t border-[#D1CDC7] mb-24" />
+
+      {/* Row 2: Multijoueur */}
+      <section className="mb-24">
+        <div className="mb-10">
+          <span className="eyebrow">Multijoueur</span>
+          <h2 className="text-2xl md:text-3xl font-medium tracking-[-0.02em] text-[#141413] mt-2">
+            Affrontez les autres
+          </h2>
+          <p className="text-sm text-[#555555] mt-1 max-w-md">
+            Des jeux ou les autres joueurs font bouger les cotes et les enjeux.
+          </p>
+        </div>
+
+        <div className="relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-x-8 gap-y-16">
+            {multiGames.map((game, i) => (
+              <GameCard key={game.id} game={game} i={i} />
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Footer-style CTA strip */}
-      <div className="mt-32 pt-16 border-t border-[#D1CDC7] flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
+      <div className="pt-16 border-t border-[#D1CDC7] flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
         <div className="space-y-2 max-w-lg">
           <span className="eyebrow">Bonus</span>
           <h3 className="text-2xl md:text-3xl font-medium tracking-[-0.02em] text-[#141413]">
@@ -161,7 +190,7 @@ export function Games() {
           to="/"
           className="ink-pill inline-flex items-center gap-2 px-6 py-2.5 text-sm hover:bg-[#262627] transition-colors"
         >
-          Aller à l'accueil
+          Aller à l&apos;accueil
           <ArrowUpRight className="w-4 h-4" />
         </Link>
       </div>

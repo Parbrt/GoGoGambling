@@ -1,15 +1,41 @@
 import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
+import { getCurrentPrices } from "../engine/shareEngine.js";
 import type { Player } from "../types.js";
 
 const router = Router();
 
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024; // 5MB
 
+export function updatePeakNetWorth(userId: string): void {
+  const db = getDb();
+  const player = db
+    .prepare("SELECT * FROM players WHERE user_id = ?")
+    .get(userId) as Player | undefined;
+  if (!player) return;
+
+  const prices = getCurrentPrices();
+  const netWorth =
+    player.nb_point +
+    player.nb_share_A * prices.priceA +
+    player.nb_share_B * prices.priceB -
+    player.nb_debt;
+
+  if (netWorth > (player.peak_net_worth ?? 0)) {
+    db.prepare("UPDATE players SET peak_net_worth = ? WHERE user_id = ?").run(
+      Math.floor(netWorth),
+      userId
+    );
+  }
+}
+
 // GET /api/player/me
 router.get("/me", authMiddleware, (req: AuthenticatedRequest, res) => {
   const db = getDb();
+
+  updatePeakNetWorth(req.userId!);
+
   const player = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
     .get(req.userId!) as Player | undefined;
@@ -20,6 +46,37 @@ router.get("/me", authMiddleware, (req: AuthenticatedRequest, res) => {
   }
 
   res.json(player);
+});
+
+// GET /api/player/:id
+router.get("/:id", (req, res) => {
+  const db = getDb();
+  const player = db
+    .prepare(
+      "SELECT id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B, is_online, last_seen, profile_photo, peak_net_worth FROM players WHERE id = ?"
+    )
+    .get(parseInt(req.params.id, 10)) as {
+    id: number;
+    player_name: string;
+    nb_point: number;
+    nb_debt: number;
+    nb_share_A: number;
+    nb_share_B: number;
+    is_online: number;
+    last_seen: string | null;
+    profile_photo: string | null;
+    peak_net_worth: number;
+  } | undefined;
+
+  if (!player) {
+    res.status(404).json({ error: "Joueur introuvable" });
+    return;
+  }
+
+  res.json({
+    ...player,
+    is_online: player.is_online === 1,
+  });
 });
 
 // GET /api/player/check-username/:username
@@ -99,6 +156,8 @@ router.post("/update-points", authMiddleware, (req: AuthenticatedRequest, res) =
   const db = getDb();
   db.prepare("UPDATE players SET nb_point = ? WHERE user_id = ?").run(Math.round(points), req.userId!);
 
+  updatePeakNetWorth(req.userId!);
+
   const player = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
     .get(req.userId!) as Player;
@@ -129,6 +188,8 @@ router.post("/update", authMiddleware, (req: AuthenticatedRequest, res) => {
     avg_share_B_value !== undefined ? Math.round(avg_share_B_value) : null,
     req.userId!
   );
+
+  updatePeakNetWorth(req.userId!);
 
   const player = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
@@ -161,6 +222,8 @@ router.post("/daily-reward", authMiddleware, (req: AuthenticatedRequest, res) =>
   const newPoints = player.nb_point + 50;
   db.prepare("UPDATE players SET nb_point = ?, last_daily_reward_claim = ? WHERE user_id = ?")
     .run(newPoints, now.toISOString(), req.userId!);
+
+  updatePeakNetWorth(req.userId!);
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")

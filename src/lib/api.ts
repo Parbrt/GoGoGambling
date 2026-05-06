@@ -80,6 +80,8 @@ export const api = {
     dailyReward: () => post<PlayerType>("/api/player/daily-reward"),
     updateProfilePhoto: (photo: string | null) =>
       post<PlayerType>("/api/player/profile-photo", { photo }),
+    getById: (id: number) =>
+      get<PlayerType>(`/api/player/${id}`),
   },
 
   shares: {
@@ -134,6 +136,84 @@ export const api = {
         winnings: number;
         population: [number, number][];
       }>("/api/games/chicken/fight", { bet, selectedChicken, chickenA, chickenB }),
+    babyFight: {
+      state: () =>
+        get<{
+          fight: {
+            id: number;
+            babyA: { name: string; stats: number[] };
+            babyB: { name: string; stats: number[] };
+            scheduledAt: string;
+            status: string;
+            winner: number | null;
+            totalPotA: number;
+            totalPotB: number;
+            oddsA: number;
+            oddsB: number;
+            betCount: number;
+            resolvedAt: string | null;
+          } | null;
+          bets: Array<{ playerName: string; amount: number; betOn: number }>;
+          timeRemaining: number;
+        }>("/api/games/baby-fight/state"),
+      bet: (fightId: number, betOn: 1 | 2, amount: number) =>
+        post<{
+          player: PlayerType;
+          oddsA: number;
+          oddsB: number;
+          potA: number;
+          potB: number;
+        }>("/api/games/baby-fight/bet", { fightId, betOn, amount }),
+      history: (limit = 5) =>
+        get<{
+          fights: Array<{
+            id: number;
+            babyA: { name: string; stats: number[] };
+            babyB: { name: string; stats: number[] };
+            scheduledAt: string;
+            status: string;
+            winner: number | null;
+            totalPotA: number;
+            totalPotB: number;
+            oddsA: number;
+            oddsB: number;
+            betCount: number;
+            resolvedAt: string | null;
+            bets: Array<{
+              playerName: string;
+              amount: number;
+              betOn: number;
+              won: boolean;
+              winnings: number;
+            }>;
+          }>;
+        }>(`/api/games/baby-fight/history?limit=${limit}`),
+      historyDetail: (id: number) =>
+        get<{
+          fight: {
+            id: number;
+            babyA: { name: string; stats: number[] };
+            babyB: { name: string; stats: number[] };
+            scheduledAt: string;
+            status: string;
+            winner: number | null;
+            totalPotA: number;
+            totalPotB: number;
+            oddsA: number;
+            oddsB: number;
+            betCount: number;
+            resolvedAt: string | null;
+            bets: Array<{
+              playerName: string;
+              amount: number;
+              betOn: number;
+              oddsAtBet: number;
+              won: boolean;
+              winnings: number;
+            }>;
+          };
+        }>(`/api/games/baby-fight/history/${id}`),
+    },
   },
 
   leaderboard: {
