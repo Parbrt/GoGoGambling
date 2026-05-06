@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { DailyReward } from "@/components/DailyReward";
 import { ShareChart } from "@/components/ShareChart";
 import { RankBadge } from "@/components/RankBadge";
-import type { PlayerType } from "@/types";
+import type { PlayerType, ShareStats } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
 import { cacheGet, cacheHas } from "@/lib/cache";
@@ -66,6 +66,7 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
     const raw = cacheGet<Array<{ value_share_A: number; value_share_B: number; time_update: string }>>("/api/shares/history?limit=50");
     return raw?.map(s => ({ value_share_A: s.value_share_A, value_share_B: s.value_share_B, time_update: s.time_update })) ?? [];
   });
+  const [stats, setStats] = useState<ShareStats | null>(null);
   const [isLoading, setIsLoading] = useState(() => !cacheHas("/api/shares/current"));
 
   const [portfolio, setPortfolio] = useState({
@@ -84,12 +85,14 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
     let cancelled = false;
     const load = async () => {
       try {
-        const [currentPrices, shareHistory] = await Promise.all([
+        const [currentPrices, shareHistory, shareStats] = await Promise.all([
           api.shares.current(),
           api.shares.history(50),
+          api.shares.stats(),
         ]);
         if (cancelled) return;
         setPrices({ priceA: currentPrices.priceA, priceB: currentPrices.priceB });
+        setStats(shareStats);
 
         if (shareHistory.length > 0) {
           setHistory(shareHistory.map(s => ({
@@ -212,6 +215,7 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
           history={history}
           currentPriceA={prices.priceA}
           currentPriceB={prices.priceB}
+          stats={stats}
           playerShares={{
             nb_share_A: player.nb_share_A,
             avg_share_A_value: player.avg_share_A_value,
