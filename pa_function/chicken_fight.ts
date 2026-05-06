@@ -26,7 +26,7 @@ function display_chicken(chicken: number[], chicken_name: string): void {
 }
 
 function fight(chicken_A: number[], chicken_B: number[], chicken_A_name: string, chicken_B_name: string): [number[], 1 | 2] {
-  let stat_A = randint(0, 4);
+  const stat_A = randint(0, 4);
   let stat_B = stat_A;
   while (stat_B === stat_A) {
     stat_B = randint(0, 4);
@@ -38,12 +38,12 @@ function fight(chicken_A: number[], chicken_B: number[], chicken_A_name: string,
 
   console.log(chicken_stat[stat_A], ",", chicken_stat[stat_B], ",", chicken_stat[stat_C]);
 
-  let ponder_A = randint(10, 80) / 100;
+  const ponder_A = randint(10, 80) / 100;
   let ponder_B = 1;
   while ((ponder_A + ponder_B) >= 1) {
     ponder_B = randint(0, 90) / 100;
   }
-  let ponder_C = 1 - (ponder_A + ponder_B);
+  const ponder_C = 1 - (ponder_A + ponder_B);
 
   const score_A = ponder_A * chicken_A[stat_A] + ponder_B * chicken_A[stat_B] + ponder_C * chicken_A[stat_C];
   const score_B = ponder_A * chicken_B[stat_A] + ponder_B * chicken_B[stat_B] + ponder_C * chicken_B[stat_C];

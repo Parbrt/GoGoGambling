@@ -8,7 +8,6 @@ function ScrollToTop() {
   return null;
 }
 import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
 import { Home } from "@/pages/Home";
 import { Trading } from "@/pages/Trading";
 import { Games } from "@/pages/Games";
@@ -19,6 +18,9 @@ import { RoulettePage } from "@/pages/RoulettePage";
 import { SlotMachinePage } from "@/pages/SlotMachinePage";
 import { BlackjackPage } from "@/pages/BlackjackPage";
 import { Profile } from "@/pages/Profile";
+import { Shop } from "@/pages/Shop";
+import { Marketplace } from "@/pages/Marketplace";
+import { Loto } from "@/pages/Loto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +33,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationContainer } from "@/components/NotificationContainer";
 import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
+import { useBlackjackNotifications } from "@/hooks/useBlackjackNotifications";
 
 const INIT_TIMEOUT = 3000;
 
@@ -41,7 +44,8 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
   handleLogout: () => void;
 }) {
   useAutoNotifications({ currentUserId: user.id, currentPlayer: player });
-  useGlobalNotifications({ currentUserId: user.id });
+  useGlobalNotifications({ currentUserId: user.id, currentPlayerName: player.player_name });
+  useBlackjackNotifications({ currentUserId: user.id });
 
   useEffect(() => {
     api.player.setOnline().catch(console.error);
@@ -71,9 +75,6 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
     };
   }, [user.id]);
 
-  const location = useLocation();
-  const isGamePage = location.pathname.startsWith("/games/");
-
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <ScrollToTop />
@@ -91,10 +92,12 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
           <Route path="/games/blackjack" element={<BlackjackPage userId={user.id} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/profile" element={<Profile user={user} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/shop" element={<Shop player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/marketplace" element={<Marketplace player={player} onPlayerUpdate={setPlayer} />} />
+          <Route path="/loto" element={<Loto user={user} player={player} onPlayerUpdate={setPlayer} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-      {!isGamePage && <Footer />}
     </div>
   );
 }

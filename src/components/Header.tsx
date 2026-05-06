@@ -18,6 +18,7 @@ export function Header({ playerName, points, onLogout }: HeaderProps) {
     { to: "/", label: "Accueil" },
     { to: "/trading", label: "Trading" },
     { to: "/games", label: "Jeux" },
+    { to: "/shop", label: "Shop" },
     { to: "/leaderboard", label: "Classement" },
   ];
 

@@ -349,6 +349,8 @@ export function placeBet(
     playerName,
     amount,
     betOn,
+    babyAName: fight.baby_a_name,
+    babyBName: fight.baby_b_name,
     oddsA,
     oddsB,
     potA: newPotA,

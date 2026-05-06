@@ -15,6 +15,8 @@ import sharesRoutes from "./routes/shares.js";
 import gamesRoutes from "./routes/games.js";
 import babyFightRoutes from "./routes/babyFight.js";
 import leaderboardRoutes from "./routes/leaderboard.js";
+import shopRoutes from "./routes/shop.js";
+import lotoRoutes from "./routes/loto.js";
 import { scheduleFights } from "./engine/babyFightEngine.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
@@ -33,6 +35,8 @@ app.use("/api/shares", sharesRoutes);
 app.use("/api/games", gamesRoutes);
 app.use("/api/games/baby-fight", babyFightRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/shop", shopRoutes);
+app.use("/api/loto", lotoRoutes);
 
 // Health check
 app.get("/api/health", (_req, res) => {

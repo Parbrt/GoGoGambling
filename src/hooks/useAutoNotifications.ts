@@ -39,7 +39,7 @@ export function useAutoNotifications({ currentUserId, currentPlayer }: UseAutoNo
 
         if (previousRank > 0 && currentRank > previousRank) {
           const overtakenBy = sortedPlayers[previousRank - 1];
-          if (overtakenBy) {
+          if (overtakenBy && overtakenBy.is_online) {
             addNotification({
               type: "ranking",
               title: "📉 Vous avez ete depasse !",
@@ -51,7 +51,7 @@ export function useAutoNotifications({ currentUserId, currentPlayer }: UseAutoNo
 
         if (previousRank > 0 && currentRank < previousRank) {
           const overtook = sortedPlayers[currentRank];
-          if (overtook) {
+          if (overtook && overtook.is_online) {
             addNotification({
               type: "success",
               title: "📈 Vous avez depasse quelqu'un !",

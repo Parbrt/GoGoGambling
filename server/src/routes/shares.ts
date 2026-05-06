@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
-import { getCurrentPrices, insertTransactionSnapshot } from "../engine/shareEngine.js";
+import { getCurrentPrices, insertTransactionSnapshot, getShareStats } from "../engine/shareEngine.js";
 import { updatePeakNetWorth } from "./player.js";
 import type { Player, ShareSnapshot } from "../types.js";
 
@@ -12,6 +12,37 @@ const FEE_RATE = 0.02;
 router.get("/current", (_req, res) => {
   const prices = getCurrentPrices();
   res.json(prices);
+});
+
+// GET /api/shares/stats
+router.get("/stats", (_req, res) => {
+  const db = getDb();
+  const dayAgo = Math.floor(Date.now() / 1000) - 86400;
+
+  const daily = db
+    .prepare(`
+      SELECT
+        MAX(value_share_A) as daily_high_A, MIN(value_share_A) as daily_low_A,
+        MAX(value_share_B) as daily_high_B, MIN(value_share_B) as daily_low_B
+      FROM shares WHERE time_now >= ?
+    `)
+    .get(dayAgo) as {
+      daily_high_A: number | null; daily_low_A: number | null;
+      daily_high_B: number | null; daily_low_B: number | null;
+    };
+
+  const { athA, atlA, athB, atlB } = getShareStats();
+
+  res.json({
+    dailyHighA: daily.daily_high_A,
+    dailyLowA: daily.daily_low_A,
+    dailyHighB: daily.daily_high_B,
+    dailyLowB: daily.daily_low_B,
+    athA,
+    atlA,
+    athB,
+    atlB,
+  });
 });
 
 // GET /api/shares/history

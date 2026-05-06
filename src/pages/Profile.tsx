@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { cacheGet } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DebtManager } from "@/components/DebtManager";
+import { Inventory } from "@/components/Inventory";
 import type { PlayerType } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
@@ -15,7 +17,9 @@ interface ProfileProps {
 }
 
 export function Profile({ player, onPlayerUpdate }: ProfileProps) {
-  const [prices, setPrices] = useState({ priceA: 2000, priceB: 400 });
+  const [prices, setPrices] = useState(() =>
+    cacheGet<{ priceA: number; priceB: number }>("/api/shares/current") ?? { priceA: 2000, priceB: 400 }
+  );
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -306,6 +310,8 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
       </div>
 
       <DebtManager player={player} onPlayerUpdate={handlePlayerUpdate} />
+
+      <Inventory />
     </div>
   );
 }

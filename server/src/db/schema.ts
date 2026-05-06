@@ -1,4 +1,5 @@
 import { getDb } from "./connection.js";
+import { ITEMS_CATALOG } from "../data/items.js";
 
 export function initSchema(): void {
   const db = getDb();
@@ -18,7 +19,9 @@ export function initSchema(): void {
       last_daily_reward_claim TEXT,
       is_online INTEGER NOT NULL DEFAULT 0,
       last_seen TEXT,
-      profile_photo TEXT
+      profile_photo TEXT,
+      loto_tickets INTEGER NOT NULL DEFAULT 0,
+      last_loto_ticket_claim TEXT
     );
 
     CREATE TABLE IF NOT EXISTS shares (
@@ -30,6 +33,14 @@ export function initSchema(): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_shares_time_now ON shares(time_now);
+
+    CREATE TABLE IF NOT EXISTS share_stats (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      ath_A REAL NOT NULL,
+      atl_A REAL NOT NULL,
+      ath_B REAL NOT NULL,
+      atl_B REAL NOT NULL
+    );
 
     CREATE TABLE IF NOT EXISTS slot_machine (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +60,16 @@ export function initSchema(): void {
 
   // Migrate: add peak_net_worth column for existing databases
   migratePeakNetWorthColumn(db);
+
+  // Migrate: add last_daily_free_box column for existing databases
+  migrateLastDailyFreeBoxColumn(db);
+
+  // Migrate: add loto columns for existing databases
+  migrateLotoColumns(db);
+
+  // Migrate: add loto columns for existing databases
+  migrateLotoTicketsColumn(db);
+  migrateLastLotoTicketClaimColumn(db);
 
   // Create baby fight tables
   db.exec(`
@@ -89,6 +110,26 @@ export function initSchema(): void {
     CREATE INDEX IF NOT EXISTS idx_baby_fight_bets_fight ON baby_fight_bets(fight_id);
   `);
 
+  // Create shop / loot box tables
+  createShopTables(db);
+
+  // Create loto history table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS loto_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      player_name TEXT NOT NULL,
+      prize_name TEXT NOT NULL,
+      prize_type TEXT NOT NULL,
+      prize_value INTEGER NOT NULL DEFAULT 0,
+      won INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_loto_history_created ON loto_history(created_at DESC);
+  `);
+
   // Reset stale online status on server startup
   resetOnlineStatus(db);
 
@@ -96,6 +137,112 @@ export function initSchema(): void {
   const jackpot = db.prepare("SELECT id FROM slot_machine LIMIT 1").get();
   if (!jackpot) {
     db.prepare("INSERT INTO slot_machine (nb_point, updated_at) VALUES (?, ?)").run(10000, new Date().toISOString());
+  }
+
+  // Seed items catalog
+  seedItemsCatalog(db);
+}
+
+function createShopTables(db: ReturnType<typeof getDb>): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS items_catalog (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      rarity TEXT NOT NULL,
+      base_value INTEGER NOT NULL DEFAULT 0,
+      qualifyable INTEGER NOT NULL DEFAULT 0,
+      emoji TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS player_inventory (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      item_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      star_level INTEGER NOT NULL DEFAULT 0,
+      acquired_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (item_id) REFERENCES items_catalog(id),
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_player_inventory_user ON player_inventory(user_id);
+    CREATE INDEX IF NOT EXISTS idx_player_inventory_item ON player_inventory(item_id);
+
+    CREATE TABLE IF NOT EXISTS player_equipped (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL UNIQUE,
+      equipped_title_inventory_id INTEGER,
+      equipped_object_inventory_id INTEGER,
+      FOREIGN KEY (equipped_title_inventory_id) REFERENCES player_inventory(id),
+      FOREIGN KEY (equipped_object_inventory_id) REFERENCES player_inventory(id),
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS marketplace_listings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      seller_user_id TEXT NOT NULL,
+      inventory_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      star_level INTEGER NOT NULL DEFAULT 0,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      price INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (inventory_id) REFERENCES player_inventory(id),
+      FOREIGN KEY (seller_user_id) REFERENCES players(user_id),
+      FOREIGN KEY (item_id) REFERENCES items_catalog(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_marketplace_listings_item ON marketplace_listings(item_id);
+    CREATE INDEX IF NOT EXISTS idx_marketplace_listings_seller ON marketplace_listings(seller_user_id);
+
+    CREATE TABLE IF NOT EXISTS marketplace_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      buyer_user_id TEXT NOT NULL,
+      seller_user_id TEXT NOT NULL,
+      listing_id INTEGER NOT NULL,
+      item_id INTEGER NOT NULL,
+      star_level INTEGER NOT NULL DEFAULT 0,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      price INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (buyer_user_id) REFERENCES players(user_id),
+      FOREIGN KEY (seller_user_id) REFERENCES players(user_id),
+      FOREIGN KEY (listing_id) REFERENCES marketplace_listings(id),
+      FOREIGN KEY (item_id) REFERENCES items_catalog(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_marketplace_tx_buyer ON marketplace_transactions(buyer_user_id);
+    CREATE INDEX IF NOT EXISTS idx_marketplace_tx_seller ON marketplace_transactions(seller_user_id);
+  `);
+}
+
+function seedItemsCatalog(db: ReturnType<typeof getDb>): void {
+  const count = db.prepare("SELECT COUNT(*) as cnt FROM items_catalog").get() as { cnt: number };
+
+  if (count.cnt === 0) {
+    const insert = db.prepare(
+      "INSERT INTO items_catalog (name, category, rarity, base_value, qualifyable, emoji, description) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    );
+
+    const transaction = db.transaction(() => {
+      for (const item of ITEMS_CATALOG) {
+        insert.run(
+          item.name,
+          item.category,
+          item.rarity,
+          item.base_value,
+          item.qualifyable ? 1 : 0,
+          item.emoji,
+          item.description
+        );
+      }
+    });
+
+    transaction();
+    console.log(`[schema] Seeded ${ITEMS_CATALOG.length} items into catalog`);
   }
 }
 
@@ -121,9 +268,11 @@ function migrateAvgShareColumns(db: ReturnType<typeof getDb>): void {
         last_daily_reward_claim TEXT,
         is_online INTEGER NOT NULL DEFAULT 0,
         last_seen TEXT,
-      profile_photo TEXT
+        profile_photo TEXT,
+        loto_tickets INTEGER NOT NULL DEFAULT 0,
+        last_loto_ticket_claim TEXT
       );
-      INSERT INTO players_migrated SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, avg_share_A_value, nb_share_B, avg_share_B_value, last_login, last_daily_reward_claim, is_online, NULL, NULL FROM players;
+      INSERT INTO players_migrated SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, avg_share_A_value, nb_share_B, avg_share_B_value, last_login, last_daily_reward_claim, is_online, NULL, NULL, 0, NULL FROM players;
       DROP TABLE players;
       ALTER TABLE players_migrated RENAME TO players;
     `);
@@ -154,7 +303,43 @@ function migratePeakNetWorthColumn(db: ReturnType<typeof getDb>): void {
   }
 }
 
+function migrateLotoTicketsColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "loto_tickets")) {
+    db.prepare("ALTER TABLE players ADD COLUMN loto_tickets INTEGER NOT NULL DEFAULT 0").run();
+    console.log("[schema] Added loto_tickets column");
+  }
+}
+
+function migrateLastLotoTicketClaimColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "last_loto_ticket_claim")) {
+    db.prepare("ALTER TABLE players ADD COLUMN last_loto_ticket_claim TEXT").run();
+    console.log("[schema] Added last_loto_ticket_claim column");
+  }
+}
+
 function resetOnlineStatus(db: ReturnType<typeof getDb>): void {
   db.prepare("UPDATE players SET is_online = 0").run();
   console.log("[schema] Reset all online statuses");
+}
+
+function migrateLastDailyFreeBoxColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "last_daily_free_box")) {
+    db.prepare("ALTER TABLE players ADD COLUMN last_daily_free_box TEXT").run();
+    console.log("[schema] Added last_daily_free_box column");
+  }
+}
+
+function migrateLotoColumns(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "loto_tickets")) {
+    db.prepare("ALTER TABLE players ADD COLUMN loto_tickets INTEGER NOT NULL DEFAULT 0").run();
+    console.log("[schema] Added loto_tickets column");
+  }
+  if (!info.find(c => c.name === "last_loto_ticket_claim")) {
+    db.prepare("ALTER TABLE players ADD COLUMN last_loto_ticket_claim TEXT").run();
+    console.log("[schema] Added last_loto_ticket_claim column");
+  }
 }

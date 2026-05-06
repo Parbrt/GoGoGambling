@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import type { ShareStats } from "@/types";
 
 interface HistoryPoint {
   value_share_A: number;
@@ -13,6 +14,7 @@ interface ShareChartProps {
   history: HistoryPoint[];
   currentPriceA: number;
   currentPriceB: number;
+  stats: ShareStats | null;
   playerShares: {
     nb_share_A: number;
     avg_share_A_value: number;
@@ -76,7 +78,7 @@ function normalizePoints(raw: ChartPoint[]): ChartPoint[] {
   return [...padded, ...raw];
 }
 
-export function ShareChart({ history, currentPriceA, currentPriceB, playerShares }: ShareChartProps) {
+export function ShareChart({ history, currentPriceA, currentPriceB, stats, playerShares }: ShareChartProps) {
   const [selectedShare, setSelectedShare] = useState<"A" | "B">("A");
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -259,6 +261,31 @@ export function ShareChart({ history, currentPriceA, currentPriceB, playerShares
             </div>
           )}
         </div>
+
+        {/* Daily + ATH/ATL stats row */}
+        {stats && (() => {
+          const dailyH = selectedShare === "A" ? stats.dailyHighA : stats.dailyHighB;
+          const dailyL = selectedShare === "A" ? stats.dailyLowA : stats.dailyLowB;
+          const ath    = selectedShare === "A" ? stats.athA : stats.athB;
+          const atl    = selectedShare === "A" ? stats.atlA : stats.atlB;
+          return (
+            <div className="grid grid-cols-4 gap-2 text-center">
+              {[
+                { label: "Haut 24h", value: dailyH },
+                { label: "Bas 24h",  value: dailyL },
+                { label: "ATH",      value: ath },
+                { label: "ATL",      value: atl },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-muted rounded-xl px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.08em] text-[#696969] font-medium mb-0.5">{label}</p>
+                  <p className="text-sm font-medium tabular-nums text-[#141413]">
+                    {value == null ? "—" : formatBigPrice(value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Chart */}
         <div className="w-full bg-[#FCFBFA] rounded-2xl border border-[#D1CDC7] overflow-hidden">

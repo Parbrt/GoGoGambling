@@ -5,9 +5,10 @@ import { api } from "@/lib/api";
 
 interface UseGlobalNotificationsProps {
   currentUserId: string | null;
+  currentPlayerName: string | null;
 }
 
-export function useGlobalNotifications({ currentUserId }: UseGlobalNotificationsProps) {
+export function useGlobalNotifications({ currentUserId, currentPlayerName }: UseGlobalNotificationsProps) {
   const { addNotification } = useNotifications();
   const previousLowPointsRef = useRef<string[]>([]);
 
@@ -23,14 +24,29 @@ export function useGlobalNotifications({ currentUserId }: UseGlobalNotifications
     },
   });
 
-  // Check for low points players - only notify when someone NEW goes below 50
+  // Listen for baby fight bets via WebSocket
+  useWebSocket({
+    onBabyFight: (type, data) => {
+      if (type !== "baby_fight:bet") return;
+      if (data.playerName === currentPlayerName) return;
+      const babyName = data.betOn === 1 ? data.babyAName : data.babyBName;
+      addNotification({
+        type: "info",
+        title: "👶 Pari Baby Fight !",
+        message: `${data.playerName} a mise ${(data.amount as number).toLocaleString()} points sur ${babyName} ! Rejoignez le combat !`,
+        duration: 6000,
+      });
+    },
+  });
+
+  // Check for low points players - only notify when someone NEW goes below 50 AND is online
   useEffect(() => {
     const checkLowPoints = async () => {
       try {
         const players = await api.leaderboard.list();
 
         const currentLowPointsPlayers = players
-          .filter(p => (p.nb_point - p.nb_debt) < 50)
+          .filter(p => p.is_online && (p.nb_point - p.nb_debt) < 50)
           .map(p => p.user_id);
 
         const newLowPointsPlayers = currentLowPointsPlayers.filter(

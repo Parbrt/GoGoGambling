@@ -65,6 +65,16 @@ const multiGames: Game[] = [
     tone: "linear-gradient(135deg, #0a5c36 0%, #1a8a4a 100%)",
     category: "Cartes",
   },
+  {
+    id: "loto",
+    name: "Loto",
+    description:
+      "Tentez votre chance au tirage. Jackpot à 50 000 pts, lots mystères et tickets bonus à gagner.",
+    icon: "🎱",
+    path: "/loto",
+    tone: "linear-gradient(135deg, #E8D5F5 0%, #7C3AED 100%)",
+    category: "Tirage",
+  },
 ];
 
 function GameCard({ game, i }: { game: Game; i: number }) {
@@ -178,22 +188,7 @@ export function Games() {
         </div>
       </section>
 
-      {/* Footer-style CTA strip */}
-      <div className="pt-16 border-t border-[#D1CDC7] flex flex-col md:flex-row items-start md:items-end justify-between gap-6">
-        <div className="space-y-2 max-w-lg">
-          <span className="eyebrow">Bonus</span>
-          <h3 className="text-2xl md:text-3xl font-medium tracking-[-0.02em] text-[#141413]">
-            Une récompense quotidienne vous attend chaque jour à 9h00.
-          </h3>
-        </div>
-        <Link
-          to="/"
-          className="ink-pill inline-flex items-center gap-2 px-6 py-2.5 text-sm hover:bg-[#262627] transition-colors"
-        >
-          Aller à l&apos;accueil
-          <ArrowUpRight className="w-4 h-4" />
-        </Link>
-      </div>
+
     </div>
   );
 }

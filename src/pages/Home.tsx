@@ -5,6 +5,7 @@ import { RankBadge } from "@/components/RankBadge";
 import type { PlayerType } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
+import { cacheGet, cacheHas } from "@/lib/cache";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { generateMockHistory } from "@/lib/shareLogic";
 
@@ -58,9 +59,14 @@ function calculateTotalPortfolioValue(
 }
 
 export function Home({ player, onPlayerUpdate }: HomeProps) {
-  const [prices, setPrices] = useState({ priceA: 2000, priceB: 400 });
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [prices, setPrices] = useState<{ priceA: number; priceB: number }>(() =>
+    cacheGet<{ priceA: number; priceB: number }>("/api/shares/current") ?? { priceA: 2000, priceB: 400 }
+  );
+  const [history, setHistory] = useState<HistoryPoint[]>(() => {
+    const raw = cacheGet<Array<{ value_share_A: number; value_share_B: number; time_update: string }>>("/api/shares/history?limit=50");
+    return raw?.map(s => ({ value_share_A: s.value_share_A, value_share_B: s.value_share_B, time_update: s.time_update })) ?? [];
+  });
+  const [isLoading, setIsLoading] = useState(() => !cacheHas("/api/shares/current"));
 
   const [portfolio, setPortfolio] = useState({
     profitA: 0, profitB: 0, totalProfit: 0, totalValue: 0,

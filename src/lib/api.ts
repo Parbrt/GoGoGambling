@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { cacheGet, cacheSet, cacheHas, cacheIsFresh } from "./cache";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "";
 
@@ -60,8 +61,23 @@ function post<T>(path: string, body?: unknown): Promise<T> {
   });
 }
 
+// Returns cached data instantly if available, triggers background refresh when stale
+function cachedGet<T>(path: string, ttl: number): Promise<T> {
+  if (cacheHas(path)) {
+    const cached = cacheGet<T>(path)!;
+    if (!cacheIsFresh(path)) {
+      get<T>(path).then(fresh => cacheSet(path, fresh, ttl)).catch(() => {});
+    }
+    return Promise.resolve(cached);
+  }
+  return get<T>(path).then(data => {
+    cacheSet(path, data, ttl);
+    return data;
+  });
+}
+
 // --- Player API ---
-import type { PlayerType } from "@/types";
+import type { PlayerType, LotoHistoryEntry, LotoPlayResult } from "@/types";
 
 export const api = {
   player: {
@@ -85,10 +101,10 @@ export const api = {
   },
 
   shares: {
-    current: () => get<{ priceA: number; priceB: number; timestamp: number }>("/api/shares/current"),
-    history: (limit = 50) => get<Array<{
+    current: () => cachedGet<{ priceA: number; priceB: number; timestamp: number }>("/api/shares/current", 15_000),
+    history: (limit = 50) => cachedGet<Array<{
       id: number; value_share_A: number; value_share_B: number; time_now: number; time_update: string;
-    }>>(`/api/shares/history?limit=${limit}`),
+    }>>(`/api/shares/history?limit=${limit}`, 60_000),
     buy: (shareType: "A" | "B", quantity: number) =>
       post<{ player: PlayerType; prices: { priceA: number; priceB: number }; cost: number; fee: number }>(
         "/api/shares/buy", { shareType, quantity }
@@ -97,6 +113,11 @@ export const api = {
       post<{ player: PlayerType; prices: { priceA: number; priceB: number }; revenue: number }>(
         "/api/shares/sell", { shareType, quantity }
       ),
+    stats: () => get<{
+      dailyHighA: number | null; dailyLowA: number | null;
+      dailyHighB: number | null; dailyLowB: number | null;
+      athA: number; atlA: number; athB: number; atlB: number;
+    }>("/api/shares/stats"),
   },
 
   games: {
@@ -217,6 +238,131 @@ export const api = {
   },
 
   leaderboard: {
-    list: () => get<PlayerType[]>("/api/leaderboard"),
+    list: () => cachedGet<PlayerType[]>("/api/leaderboard", 15_000),
+  },
+
+  loto: {
+    tickets: () =>
+      get<{ tickets: number; canClaim: boolean }>("/api/loto/tickets"),
+    claimTicket: () =>
+      post<{ tickets: number; canClaim: boolean }>("/api/loto/claim-ticket"),
+    play: () => post<LotoPlayResult>("/api/loto/play"),
+    history: () => get<LotoHistoryEntry[]>("/api/loto/history"),
+  },
+
+  shop: {
+    catalog: () => cachedGet<Array<{
+      id: number;
+      name: string;
+      category: string;
+      rarity: string;
+      base_value: number;
+      qualifyable: number;
+      emoji: string;
+      description: string;
+    }>>("/api/shop/catalog", 300_000),
+    boxes: () => cachedGet<{
+      boxes: Array<{
+        key: string;
+        name: string;
+        cost: number;
+        emoji: string;
+        description: string;
+        probabilities: Record<string, number>;
+      }>;
+      rarities: Record<string, {
+        key: string;
+        label: string;
+        color: string;
+      }>;
+    }>("/api/shop/boxes", 300_000),
+    openBox: (boxType: string) =>
+      post<{
+        item: {
+          id: number;
+          name: string;
+          category: string;
+          rarity: string;
+          base_value: number;
+          emoji: string;
+          description: string;
+        };
+        rolledRarity: string;
+        rarityColor: string;
+        player: PlayerType;
+      }>("/api/shop/open-box", { boxType }),
+    inventory: () => get<Array<{
+      id: number;
+      user_id: string;
+      item_id: number;
+      quantity: number;
+      star_level: number;
+      acquired_at: string;
+      name: string;
+      category: string;
+      rarity: string;
+      base_value: number;
+      qualifyable: number;
+      emoji: string;
+      description: string;
+    }>>("/api/shop/inventory"),
+    equip: (inventoryId: number | null, slot: "title" | "object") =>
+      post<{
+        id: number;
+        user_id: string;
+        equipped_title_inventory_id: number | null;
+        equipped_object_inventory_id: number | null;
+      }>("/api/shop/equip", { inventoryId, slot }),
+    equipped: (userId?: string) =>
+      get<{
+        equipped_title: Record<string, unknown> | null;
+        equipped_object: Record<string, unknown> | null;
+      }>(`/api/shop/equipped${userId ? `/${userId}` : ""}`),
+    fuse: (inventoryId: number) =>
+      post<{ success: boolean; item_name: string; new_star_level: number; base_value: number }>(
+        "/api/shop/fuse",
+        { inventoryId }
+      ),
+    boxHistory: () => get<Array<Record<string, unknown>>>("/api/shop/box-history"),
+    dailyFreeBox: () =>
+      post<{
+        item: Record<string, unknown>;
+        rolledRarity: string;
+        rarityColor: string;
+        player: PlayerType;
+        free: boolean;
+      }>("/api/shop/daily-free-box"),
+    marketplace: {
+      list: (inventoryId: number, quantity: number, price: number) =>
+        post<{ success: boolean; listingId: number }>("/api/shop/marketplace/list", {
+          inventoryId,
+          quantity,
+          price,
+        }),
+      listings: () =>
+        get<
+          Array<{
+            id: number;
+            seller_user_id: string;
+            inventory_id: number;
+            item_id: number;
+            star_level: number;
+            quantity: number;
+            price: number;
+            created_at: string;
+            seller_name: string;
+            item_name: string;
+            item_rarity: string;
+            item_emoji: string;
+            item_category: string;
+          }>
+        >("/api/shop/marketplace/listings"),
+      buy: (listingId: number) =>
+        post<{ success: boolean; price: number }>("/api/shop/marketplace/buy", { listingId }),
+      cancel: (listingId: number) =>
+        post<{ success: boolean }>("/api/shop/marketplace/cancel", { listingId }),
+      transactions: () =>
+        get<Array<Record<string, unknown>>>("/api/shop/marketplace/transactions"),
+    },
   },
 };

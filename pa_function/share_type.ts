@@ -17,5 +17,5 @@ interface ShareSnapshot {
 }
 
 // État local du client
-let currentPlayer: Player | null = null;
-let lastSnapshot: ShareSnapshot | null = null;
+const currentPlayer: Player | null = null;
+const lastSnapshot: ShareSnapshot | null = null;
