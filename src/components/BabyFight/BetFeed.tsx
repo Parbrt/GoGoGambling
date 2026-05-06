@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BabyFightBet } from "@/lib/babyFightGame";
 
@@ -36,7 +37,7 @@ export function BetFeed({ bets, babyAName, babyBName }: BetFeedProps) {
             >
               <span className="font-medium truncate mr-2">{bet.playerName}</span>
               <span className="text-muted-foreground">
-                mise <span className="font-bold text-foreground">{bet.amount.toLocaleString()}</span> pts
+                mise <span className="font-bold text-foreground">{formatCompactPoints(bet.amount)}</span> pts
                 sur <span className={`font-bold ${bet.betOn === 1 ? "text-blue-600" : "text-red-600"}`}>
                   {bet.betOn === 1 ? babyAName : babyBName}
                 </span>

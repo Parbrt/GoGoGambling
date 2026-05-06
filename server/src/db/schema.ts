@@ -79,6 +79,9 @@ export function initSchema(): void {
   // Migrate: add chicken charges columns
   migrateChickenChargesColumns(db);
 
+  // Migrate: add display_style column to player_inventory
+  migrateDisplayStyleColumn(db);
+
   // Create baby fight tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS baby_fights (
@@ -227,6 +230,29 @@ function createShopTables(db: ReturnType<typeof getDb>): void {
 
     CREATE INDEX IF NOT EXISTS idx_marketplace_tx_buyer ON marketplace_transactions(buyer_user_id);
     CREATE INDEX IF NOT EXISTS idx_marketplace_tx_seller ON marketplace_transactions(seller_user_id);
+
+    CREATE TABLE IF NOT EXISTS daily_deals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deal_date TEXT NOT NULL,
+      slot INTEGER NOT NULL CHECK(slot BETWEEN 1 AND 3),
+      item_id INTEGER NOT NULL,
+      price INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (item_id) REFERENCES items_catalog(id)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_deals_date_slot ON daily_deals(deal_date, slot);
+
+    CREATE TABLE IF NOT EXISTS daily_deal_purchases (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      deal_id INTEGER NOT NULL,
+      purchased_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES players(user_id),
+      FOREIGN KEY (deal_id) REFERENCES daily_deals(id)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_deal_purchases_user_deal ON daily_deal_purchases(user_id, deal_id);
   `);
 }
 
@@ -437,6 +463,14 @@ function migrateLotoTicketsV2IsFree(db: ReturnType<typeof getDb>): void {
   if (!info.find(c => c.name === "is_free")) {
     db.prepare("ALTER TABLE loto_tickets_v2 ADD COLUMN is_free INTEGER NOT NULL DEFAULT 0").run();
     console.log("[schema] Added is_free column to loto_tickets_v2");
+  }
+}
+
+function migrateDisplayStyleColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(player_inventory)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "display_style")) {
+    db.prepare("ALTER TABLE player_inventory ADD COLUMN display_style TEXT NOT NULL DEFAULT 'default'").run();
+    console.log("[schema] Added display_style column to player_inventory");
   }
 }
 

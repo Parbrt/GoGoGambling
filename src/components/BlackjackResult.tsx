@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
+import { formatCompactPoints } from "@/lib/utils";
 import type { PlayerState } from "@/lib/blackjackGame";
 
 interface BlackjackResultProps {
@@ -32,11 +33,11 @@ export function BlackjackResult({
 
   const localDelta =
     localResult === "win" || localResult === "blackjack"
-      ? `+${localPlayer?.winnings ?? 0}`
+      ? `+${formatCompactPoints(localPlayer?.winnings ?? 0)}`
       : localResult === "push"
       ? `±0`
       : localResult === "lose"
-      ? `-${localPlayer?.bet ?? 0}`
+      ? `-${formatCompactPoints(localPlayer?.bet ?? 0)}`
       : null;
 
   return (
@@ -94,10 +95,10 @@ export function BlackjackResult({
                     ? "bg-[#696969]"
                     : "bg-[#CF4500]";
                   const delta = won
-                    ? `+${p.winnings}`
+                    ? `+${formatCompactPoints(p.winnings)}`
                     : push
                     ? `±0`
-                    : `-${p.bet}`;
+                    : `-${formatCompactPoints(p.bet)}`;
                   return (
                     <div
                       key={p.userId}

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { getRankInfo } from "@/lib/ranks";
 
 interface RankBadgeProps {
@@ -21,7 +22,7 @@ export function RankBadge({ peakNetWorth }: RankBadgeProps) {
         </div>
         {rank.nextThreshold !== null && (
           <p className="text-xs text-[#696969] tabular-nums">
-            {peakNetWorth.toLocaleString()} / {rank.nextThreshold.toLocaleString()} pts
+            {formatCompactPoints(peakNetWorth)} / {formatCompactPoints(rank.nextThreshold)} pts
           </p>
         )}
       </div>

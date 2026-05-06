@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCompactPoints } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { BABY_STATS, getScoreLabel, formatOdds } from "@/lib/babyFightGame";
@@ -73,7 +74,7 @@ export function BabyCard({ name, stats, odds, pot, betOn, selected, onSelect, di
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground text-center">
-            Pot: {pot.toLocaleString()} pts
+            Pot: {formatCompactPoints(pot)} pts
           </div>
         </div>
         {selected && (

@@ -8,6 +8,7 @@ import RoulettePro from "react-roulette-pro";
 import "react-roulette-pro/dist/index.css";
 import { isEven, ROULETTE_NUMBERS } from "@/lib/rouletteGame";
 import { api } from "@/lib/api";
+import { formatCompactPoints } from "@/lib/utils";
 
 interface RouletteProps {
   userId: string;
@@ -72,7 +73,7 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
 
       const multiplier = betType === "odd-even" ? 2 : 36;
       if (result.isWin) {
-        setResultMessage(`Felicitations ! Le numero ${result.winningNumber} est sorti ! Vous avez gagne ${result.winnings} points (x${multiplier}) !`);
+        setResultMessage(`Felicitations ! Le numero ${result.winningNumber} est sorti ! Vous avez gagne ${formatCompactPoints(result.winnings)} points (x${multiplier}) !`);
       } else {
         setResultMessage(`Le numero ${result.winningNumber} est sorti... Vous avez perdu votre mise.`);
       }
@@ -119,7 +120,7 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
         {error && <div className="p-4 bg-destructive/10 text-destructive rounded-lg">{error}</div>}
 
         <div className="text-center">
-          <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{currentPoints}</span></p>
+          <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{formatCompactPoints(currentPoints)}</span></p>
         </div>
 
         {phase === "betting" && (
@@ -175,7 +176,7 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Montant de votre mise:</label>
-                  <Input type="number" min={0} max={currentPoints} value={betAmount} onChange={(e) => handleBetAmountChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${currentPoints} points`} />
+                  <Input type="number" min={0} max={currentPoints} value={betAmount} onChange={(e) => handleBetAmountChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${formatCompactPoints(currentPoints)} points`} />
                 </div>
                 <div className="flex justify-between gap-2">
                   <Button variant="outline" onClick={() => handleBetAmountChange(betAmount + 10)} className="flex-1">+10</Button>
@@ -188,7 +189,7 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
             )}
 
             <Button onClick={handleSpin} disabled={!betType || betChoice === null || betAmount <= 0 || betAmount > currentPoints} className="w-full" size="lg">
-              {betType && betChoice !== null && betAmount > 0 ? `Lancer la roulette (${betAmount} points)` : "Choisissez votre pari"}
+              {betType && betChoice !== null && betAmount > 0 ? `Lancer la roulette (${formatCompactPoints(betAmount)} points)` : "Choisissez votre pari"}
             </Button>
           </>
         )}
@@ -212,7 +213,7 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
                 <p><span className="font-semibold">Type de pari:</span> {betType === "odd-even" ? "Impair/Pair" : "Numero"}</p>
                 <p><span className="font-semibold">Votre choix:</span> {betType === "odd-even" ? (betChoice === 1 ? "Impair" : "Pair") : betChoice}</p>
                 <p><span className="font-semibold">Numero gagnant:</span> {winningNumber} ({isEven(winningNumber) ? "Pair" : "Impair"})</p>
-                <p><span className="font-semibold">Mise:</span> {betAmount} points</p>
+                <p><span className="font-semibold">Mise:</span> {formatCompactPoints(betAmount)} points</p>
               </CardContent>
             </Card>
             <Button onClick={handleNextRound} size="lg">Rejouer</Button>

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCompactPoints } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import type { BabyFightHistoryEntryLocal } from "@/hooks/useBabyFight";
 
@@ -39,7 +40,7 @@ export function FightHistory({ history }: FightHistoryProps) {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>🏆 {winnerName}</span>
                   <span>
-                    Pot: {(fight.totalPotA + fight.totalPotB).toLocaleString()} pts
+                    Pot: {formatCompactPoints(fight.totalPotA + fight.totalPotB)} pts
                   </span>
                   <span>{fight.betCount} parieurs</span>
                 </div>

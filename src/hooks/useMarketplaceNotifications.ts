@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 import { api } from "@/lib/api";
 
@@ -41,7 +42,7 @@ export function useMarketplaceNotifications({ currentUserId }: UseMarketplaceNot
             addNotification({
               type: "marketplace",
               title: "Nouvelle vente !",
-              message: `${tx.buyer_name} a achete ${tx.item_emoji} ${tx.item_name} pour ${(tx.price as number).toLocaleString()} pts`,
+              message: `${tx.buyer_name} a achete ${tx.item_emoji} ${tx.item_name} pour ${formatCompactPoints(tx.price as number)} pts`,
               duration: 8000,
             });
           }

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatCompactPoints } from "@/lib/utils";
 
 interface BetPanelProps {
   betAmount: number;
@@ -50,7 +51,7 @@ export function BetPanel({ betAmount, maxPoints, onBetChange, onBet, disabled, l
             className="w-full bg-[#F37338] hover:bg-[#E06328]"
             size="lg"
           >
-            {loading ? "Paris en cours..." : `Parier ${betAmount > 0 ? betAmount.toLocaleString() + " pts" : ""}`}
+            {loading ? "Paris en cours..." : `Parier ${betAmount > 0 ? formatCompactPoints(betAmount) + " pts" : ""}`}
           </Button>
         </>
       )}

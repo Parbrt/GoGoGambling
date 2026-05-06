@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { BabyFight } from "@/components/BabyFight";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +121,7 @@ export function BabyFightPage({ player, onPlayerUpdate }: BabyFightPageProps) {
                         </div>
                         <div className="flex items-center gap-1 text-xs text-[#696969]">
                           <Coins className="w-3.5 h-3.5" />
-                          <span>{totalPot.toLocaleString()} pts</span>
+                          <span>{formatCompactPoints(totalPot)} pts</span>
                         </div>
                         <div className="flex items-center gap-1 text-xs text-[#696969]">
                           <Users className="w-3.5 h-3.5" />
@@ -157,7 +158,7 @@ export function BabyFightPage({ player, onPlayerUpdate }: BabyFightPageProps) {
                                 <StatBar key={i} label={BABY_STATS[i]} value={value} />
                               ))}
                             </div>
-                            <p className="text-xs text-[#696969]">Pot: {fight.totalPotA.toLocaleString()} pts</p>
+                            <p className="text-xs text-[#696969]">Pot: {formatCompactPoints(fight.totalPotA)} pts</p>
                             <p className="text-xs text-[#696969]">Parieurs: {fight.bets.filter((b) => b.betOn === 1).length}</p>
                           </div>
 
@@ -180,7 +181,7 @@ export function BabyFightPage({ player, onPlayerUpdate }: BabyFightPageProps) {
                                 <StatBar key={i} label={BABY_STATS[i]} value={value} />
                               ))}
                             </div>
-                            <p className="text-xs text-[#696969]">Pot: {fight.totalPotB.toLocaleString()} pts</p>
+                            <p className="text-xs text-[#696969]">Pot: {formatCompactPoints(fight.totalPotB)} pts</p>
                             <p className="text-xs text-[#696969]">Parieurs: {fight.bets.filter((b) => b.betOn === 2).length}</p>
                           </div>
                         </div>
@@ -203,9 +204,9 @@ export function BabyFightPage({ player, onPlayerUpdate }: BabyFightPageProps) {
                                 <tr key={`win-${i}`} className="border-b border-[#D1CDC7]/30">
                                   <td className="py-2 px-2 font-medium text-[#141413]">{bet.playerName}</td>
                                   <td className="py-2 px-2 text-[#696969]">{bet.betOn === 1 ? fight.babyA.name : fight.babyB.name}</td>
-                                  <td className="py-2 px-2 text-right text-[#141413]">{bet.amount.toLocaleString()} pts</td>
+                                  <td className="py-2 px-2 text-right text-[#141413]">{formatCompactPoints(bet.amount)} pts</td>
                                   <td className="py-2 px-2 text-right">
-                                    <span className="text-green-600 font-bold">+{bet.winnings.toLocaleString()} pts</span>
+                                    <span className="text-green-600 font-bold">+{formatCompactPoints(bet.winnings)} pts</span>
                                   </td>
                                 </tr>
                               ))}
@@ -213,7 +214,7 @@ export function BabyFightPage({ player, onPlayerUpdate }: BabyFightPageProps) {
                                 <tr key={`lose-${i}`} className="border-b border-[#D1CDC7]/30">
                                   <td className="py-2 px-2 font-medium text-[#141413]">{bet.playerName}</td>
                                   <td className="py-2 px-2 text-[#696969]">{bet.betOn === 1 ? fight.babyA.name : fight.babyB.name}</td>
-                                  <td className="py-2 px-2 text-right text-[#141413]">{bet.amount.toLocaleString()} pts</td>
+                                  <td className="py-2 px-2 text-right text-[#141413]">{formatCompactPoints(bet.amount)} pts</td>
                                   <td className="py-2 px-2 text-right">
                                     <span className="text-[#CF4500] font-medium">Perdu</span>
                                   </td>

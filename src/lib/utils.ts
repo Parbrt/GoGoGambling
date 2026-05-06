@@ -8,7 +8,10 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCompactPoints(points: number): string {
   const abs = Math.abs(points);
   if (abs < 10_000) return points.toLocaleString();
-  if (abs < 1_000_000) return `${(points / 1_000).toFixed(1)}k`;
-  if (abs < 1_000_000_000) return `${(points / 1_000_000).toFixed(1)}M`;
-  return `${(points / 1_000_000_000).toFixed(1)}Md`;
+
+  const format = (val: number): string => (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1));
+
+  if (abs < 1_000_000) return `${format(points / 1_000)}k`;
+  if (abs < 1_000_000_000) return `${format(points / 1_000_000)}M`;
+  return `${format(points / 1_000_000_000)}Md`;
 }

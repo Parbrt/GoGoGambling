@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { formatCompactPoints } from "@/lib/utils";
 
 interface SlotMachineProps {
   userId: string;
@@ -115,12 +116,12 @@ export function SlotMachine({ currentPoints, onPointsUpdate }: SlotMachineProps)
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center p-4 bg-primary/10 rounded-lg">
             <p className="text-sm text-muted-foreground">Vos points</p>
-            <p className="text-2xl font-bold text-primary">{currentPoints}</p>
+            <p className="text-2xl font-bold text-primary">{formatCompactPoints(currentPoints)}</p>
           </div>
           <div className="text-center p-4 bg-gradient-to-br from-yellow-100 to-orange-100 rounded-lg border-2 border-yellow-300">
             <p className="text-sm text-yellow-800 font-semibold">🎰 Jackpot commun</p>
             <p className="text-2xl font-bold text-yellow-700">
-              {isLoadingJackpot ? "..." : machinePoints.toLocaleString()}
+              {isLoadingJackpot ? "..." : formatCompactPoints(machinePoints)}
             </p>
           </div>
         </div>
@@ -137,7 +138,7 @@ export function SlotMachine({ currentPoints, onPointsUpdate }: SlotMachineProps)
             {phase === "result" && (
               <div className="mt-4 text-center">
                 <p className={`text-lg font-bold ${winType !== "none" ? "text-green-600" : "text-destructive"}`}>{resultMessage}</p>
-                {reward > 0 && <Badge className="mt-2 bg-green-500 text-white text-lg px-4 py-1">+{reward.toLocaleString()} points</Badge>}
+                {reward > 0 && <Badge className="mt-2 bg-green-500 text-white text-lg px-4 py-1">+{formatCompactPoints(reward)} points</Badge>}
               </div>
             )}
           </CardContent>
@@ -148,7 +149,7 @@ export function SlotMachine({ currentPoints, onPointsUpdate }: SlotMachineProps)
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Montant de votre mise:</label>
-                <Input type="number" min={1} max={currentPoints} value={betAmount} onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${currentPoints} points`} />
+                <Input type="number" min={1} max={currentPoints} value={betAmount} onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${formatCompactPoints(currentPoints)} points`} />
               </div>
               <div className="flex justify-between gap-2">
                 <Button variant="outline" onClick={() => handleBetChange(betAmount + 10)} className="flex-1">+10</Button>
@@ -160,7 +161,7 @@ export function SlotMachine({ currentPoints, onPointsUpdate }: SlotMachineProps)
               </div>
             </div>
             <Button onClick={handleSpin} disabled={betAmount <= 0 || betAmount > currentPoints || isLoadingJackpot} className="w-full" size="lg">
-              {isLoadingJackpot ? <Loader2 className="h-5 w-5 animate-spin" /> : betAmount > 0 ? `Lancer pour ${betAmount} points` : "Entrez une mise"}
+              {isLoadingJackpot ? <Loader2 className="h-5 w-5 animate-spin" /> : betAmount > 0 ? `Lancer pour ${formatCompactPoints(betAmount)} points` : "Entrez une mise"}
             </Button>
             <Card className="bg-muted/50">
               <CardHeader className="pb-2"><CardTitle className="text-base">Regles</CardTitle></CardHeader>
@@ -185,7 +186,7 @@ export function SlotMachine({ currentPoints, onPointsUpdate }: SlotMachineProps)
 
         {phase === "result" && (
           <div className="text-center space-y-4">
-            <Button onClick={handleRespin} disabled={betAmount <= 0 || betAmount > currentPoints} size="lg" className="w-full">Relancer ({betAmount} pts)</Button>
+            <Button onClick={handleRespin} disabled={betAmount <= 0 || betAmount > currentPoints} size="lg" className="w-full">Relancer ({formatCompactPoints(betAmount)} pts)</Button>
             <Button onClick={handleNextSpin} size="lg" variant="outline" className="w-full">Changer la mise</Button>
           </div>
         )}

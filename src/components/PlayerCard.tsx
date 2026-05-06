@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { X } from "lucide-react";
 import { api } from "@/lib/api";
 import { getRankInfo } from "@/lib/ranks";
@@ -79,8 +80,8 @@ export function PlayerCard({ playerId, onClose }: PlayerCardProps) {
               <div className="flex items-baseline justify-between text-xs text-[#696969] tabular-nums">
                 <span>Progression</span>
                 <span>
-                  {player.peak_net_worth.toLocaleString()}
-                  {rank.nextThreshold !== null && ` / ${rank.nextThreshold.toLocaleString()}`}
+                  {formatCompactPoints(player.peak_net_worth)}
+                  {rank.nextThreshold !== null && ` / ${formatCompactPoints(rank.nextThreshold)}`}
                 </span>
               </div>
               <div className="relative w-full h-2 bg-[#E8E4E0] rounded-full overflow-hidden">

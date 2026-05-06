@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { ArrowUpRight, Loader2, Sparkles, Star, X, Gift, BarChart3, Clock } from "lucide-react";
+import { ArrowUpRight, Loader2, Sparkles, Star, X, Gift, BarChart3, Clock, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/lib/api";
 import { cacheGet, cacheHas } from "@/lib/cache";
@@ -26,6 +26,7 @@ interface BoxResult {
     base_value: number;
     emoji: string;
     description: string;
+    qualifyable: number;
   };
   rolledRarity: string;
   rarityColor: string;
@@ -56,6 +57,61 @@ const RARITY_LABELS: Record<string, string> = {
 
 const RARITY_ORDER = ["unique", "exotic", "mythic", "legendary", "epic", "rare", "common"];
 
+const RARITY_CARD_STYLES: Record<string, { border: string; text: string; iconBg: string }> = {
+  unique:    { border: "border-yellow-400",   text: "text-yellow-400",   iconBg: "from-yellow-400 to-amber-500" },
+  exotic:    { border: "border-red-500",      text: "text-red-500",      iconBg: "from-red-400 to-red-600" },
+  mythic:    { border: "border-fuchsia-500",  text: "text-fuchsia-500",  iconBg: "from-fuchsia-400 to-fuchsia-600" },
+  legendary: { border: "border-orange-500",   text: "text-orange-500",   iconBg: "from-orange-400 to-orange-600" },
+  epic:      { border: "border-purple-500",   text: "text-purple-500",   iconBg: "from-purple-400 to-purple-600" },
+  rare:      { border: "border-blue-500",     text: "text-blue-500",     iconBg: "from-blue-400 to-blue-600" },
+  common:    { border: "border-gray-400",     text: "text-gray-400",     iconBg: "from-gray-400 to-gray-500" },
+};
+
+const RARITY_FLASH_COLORS: Record<string, string> = {
+  unique: "#FFD700", exotic: "#FF4444", mythic: "#E879F9",
+  legendary: "#FB923C", epic: "#C084FC", rare: "#60A5FA", common: "#F8F8F8",
+};
+
+const RARITY_OVERLAY_TINT: Record<string, string> = {
+  unique: "rgba(255,215,0,0.08)", exotic: "rgba(248,113,113,0.08)", mythic: "rgba(232,121,249,0.09)",
+  legendary: "rgba(251,146,60,0.08)", epic: "rgba(192,132,252,0.09)", rare: "rgba(96,165,250,0.08)",
+  common: "rgba(0,0,0,0)",
+};
+
+const RARITY_PARTICLE_COLORS: Record<string, string[]> = {
+  unique:    ["#FFD700", "#FFC107", "#FBBF24", "#FF6B00", "#FF4444", "#FFE566"],
+  exotic:    ["#FF4444", "#EF4444", "#DC2626", "#FF6B6B", "#FF8C8C"],
+  mythic:    ["#E879F9", "#D946EF", "#A21CAF", "#F0ABFC", "#C084FC"],
+  legendary: ["#FB923C", "#F97316", "#FFD700", "#CF4500", "#FF8C00"],
+  epic:      ["#C084FC", "#A855F7", "#7C3AED", "#E879F9", "#9333EA"],
+  rare:      ["#3860BE", "#60A5FA", "#93BBFF", "#2244AA", "#4080FF"],
+  common:    ["#D1CDC7", "#9A9A9A", "#BCBCBC"],
+};
+
+const RARITY_PARTICLE_COUNT: Record<string, number> = {
+  unique: 90, exotic: 65, mythic: 72, legendary: 55, epic: 44, rare: 28, common: 10,
+};
+
+const RARITY_CARD_INITIAL: Record<string, Record<string, number>> = {
+  common:    { scale: 0.85, opacity: 0 },
+  rare:      { scale: 0.72, y: 32, opacity: 0 },
+  epic:      { scale: 0.6, rotate: -8, opacity: 0 },
+  legendary: { scale: 0.45, rotate: 12, opacity: 0 },
+  mythic:    { scale: 0.3, rotate: -16, opacity: 0 },
+  exotic:    { scale: 0.3, y: -40, rotate: 8, opacity: 0 },
+  unique:    { scale: 0.1, opacity: 0 },
+};
+
+const RARITY_CARD_SPRING: Record<string, Record<string, unknown>> = {
+  common:    { type: "spring", stiffness: 280, damping: 24 },
+  rare:      { type: "spring", stiffness: 300, damping: 20 },
+  epic:      { type: "spring", stiffness: 320, damping: 18 },
+  legendary: { type: "spring", stiffness: 340, damping: 16 },
+  mythic:    { type: "spring", stiffness: 360, damping: 14 },
+  exotic:    { type: "spring", stiffness: 350, damping: 15 },
+  unique:    { type: "spring", stiffness: 190, damping: 12 },
+};
+
 const BOX_GRADIENTS: Record<string, string> = {
   GAMBLINGBOX: "linear-gradient(135deg, #FFD700 0%, #CF4500 100%)",
   GOGOBOX: "linear-gradient(135deg, #F37338 0%, #9A3A0A 100%)",
@@ -66,23 +122,20 @@ const BOX_GRADIENTS: Record<string, string> = {
 
 const springBouncy = { type: "spring" as const, stiffness: 300, damping: 18 };
 const springGentle = { type: "spring" as const, stiffness: 200, damping: 24 };
-const springPop = { type: "spring" as const, stiffness: 400, damping: 12 };
-
-// Shake keyframes
-const shakeKeyframes = [0, -12, 10, -8, 6, -4, 2, 0, -2, 1, 0];
 
 // ─── Confetti particles ───
 
-const PARTICLE_COLORS = ["#FFD700", "#FF4444", "#FF44CC", "#FF8C00", "#9933FF", "#3399FF", "#F37338"];
-
-function spawnParticles(count: number): Array<{ x: number; y: number; color: string; size: number; delay: number; duration: number; rotation: number }> {
+function spawnParticles(rarity = "common"): Array<{ x: number; y: number; color: string; size: number; delay: number; duration: number; rotation: number }> {
+  const count = RARITY_PARTICLE_COUNT[rarity] ?? 20;
+  const colors = RARITY_PARTICLE_COLORS[rarity] ?? RARITY_PARTICLE_COLORS.common;
+  const spread = rarity === "unique" ? 420 : ["exotic", "mythic", "legendary"].includes(rarity) ? 340 : 270;
   return Array.from({ length: count }, () => ({
-    x: (Math.random() - 0.5) * 300,
-    y: (Math.random() - 0.5) * 300 - 40,
-    color: PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)],
-    size: 4 + Math.random() * 8,
-    delay: Math.random() * 0.3,
-    duration: 0.8 + Math.random() * 0.6,
+    x: (Math.random() - 0.5) * spread,
+    y: (Math.random() - 0.5) * spread - 60,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    size: 4 + Math.random() * (rarity === "unique" ? 12 : 7),
+    delay: Math.random() * (rarity === "unique" ? 0.5 : 0.28),
+    duration: 0.8 + Math.random() * (rarity === "unique" ? 0.9 : 0.55),
     rotation: Math.random() * 720 - 360,
   }));
 }
@@ -103,6 +156,7 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState<string | null>(null);
   const [particles, setParticles] = useState<ReturnType<typeof spawnParticles>>([]);
+  const [revealRarity, setRevealRarity] = useState<string | null>(null);
 
   // Phase 8: Pity system (localStorage)
   const [pityCounter, setPityCounter] = useState(() => {
@@ -117,6 +171,13 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
   const [freeBoxAvailable, setFreeBoxAvailable] = useState(false);
   const [freeBoxLoading, setFreeBoxLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [dailyDeals, setDailyDeals] = useState<Array<{
+    id: number; slot: number; price: number;
+    name: string; category: string; rarity: string; emoji: string; description: string;
+    purchased: boolean;
+  }>>([]);
+  const [nextDealRefreshMs, setNextDealRefreshMs] = useState(0);
+  const [dealLoading, setDealLoading] = useState<number | null>(null);
 
   const TOTAL_FRUITS = 28;
   const collectedFruits = useMemo(() => {
@@ -142,6 +203,14 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
 
     // Check free box availability
     checkFreeBox(player);
+
+    // Load daily deals
+    api.shop.dailyDeals()
+      .then((data) => {
+        setDailyDeals(data.deals);
+        setNextDealRefreshMs(data.nextRefreshMs);
+      })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -156,26 +225,30 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
     setResult(null);
     setParticles([]);
     setError(null);
+    setRevealRarity(null);
 
-    // Phase 1: Shake (800ms)
-    await new Promise((r) => setTimeout(r, 800));
-    setShowShake(false);
-
-    // Phase 2: Flash (200ms)
-    setShowFlash(true);
+    // API call starts immediately, shake runs in parallel (min 1400ms)
+    const minShake = new Promise<void>((r) => setTimeout(r, 1400));
     const apiPromise = api.shop.openBox(boxType);
 
-    await new Promise((r) => setTimeout(r, 200));
-    setShowFlash(false);
-
-    // Phase 3: Reveal
     try {
-      const data = await apiPromise;
+      const [, data] = await Promise.all([minShake, apiPromise]);
+
+      setShowShake(false);
+      setRevealRarity(data.rolledRarity);
+      await new Promise((r) => setTimeout(r, 80));
+
+      // Rarity-colored flash
+      setShowFlash(true);
+      await new Promise((r) => setTimeout(r, 340));
+      setShowFlash(false);
+      await new Promise((r) => setTimeout(r, 80));
+
+      // Reveal
       setResult(data);
-      setParticles(spawnParticles(40));
+      setParticles(spawnParticles(data.rolledRarity));
       onPlayerUpdate(data.player);
 
-      // Pity: update counter
       const isRare = ["unique", "exotic", "mythic", "legendary"].includes(data.rolledRarity);
       if (isRare) {
         setPityCounter(0);
@@ -186,7 +259,6 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
         localStorage.setItem("ggg_pity", String(next));
       }
 
-      // Reload inventory & history
       api.shop.inventory()
         .then((inv) => setInventory(inv as Array<{ name: string; category: string; emoji: string }>))
         .catch(() => {});
@@ -197,6 +269,8 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'ouverture");
       setOpening(false);
       setOpeningBoxKey(null);
+      setShowShake(false);
+      setRevealRarity(null);
     }
   }, [onPlayerUpdate, pityCounter]);
 
@@ -222,7 +296,7 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
         player: data.player,
       };
       setResult(boxResult);
-      setParticles(spawnParticles(30));
+      setParticles(spawnParticles(data.rolledRarity));
       onPlayerUpdate(data.player);
       setFreeBoxAvailable(false);
       // Reload inventory & history
@@ -246,7 +320,25 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
     setOpening(false);
     setOpeningBoxKey(null);
     setParticles([]);
+    setRevealRarity(null);
   }, []);
+
+  // ─── Buy daily deal ───
+
+  async function handleBuyDeal(dealId: number) {
+    setDealLoading(dealId);
+    try {
+      const data = await api.shop.buyDailyDeal(dealId);
+      onPlayerUpdate(data.player);
+      setDailyDeals((prev) =>
+        prev.map((d) => (d.id === dealId ? { ...d, purchased: true } : d))
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'achat");
+    } finally {
+      setDealLoading(null);
+    }
+  }
 
   // ─── Loading state ───
 
@@ -544,47 +636,78 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
         {opening && (
           <motion.div
             key="opening-overlay"
-            className="fixed inset-0 z-50 flex items-center justify-center"
+            className="fixed inset-0 z-50 flex items-center justify-center px-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
           >
-            <motion.div
-              className="absolute inset-0"
-              style={{ background: "#141413" }}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: showFlash ? 1 : 0.85 }}
-              exit={{ opacity: 0 }}
-              transition={showFlash ? { duration: 0.1 } : { duration: 0.3 }}
-            />
+            {/* Dark base */}
+            <div className="absolute inset-0 bg-[#0d0d0c]" />
 
-            {/* Shake phase — box trembles */}
+            {/* Rarity atmospheric tint — appears once rarity is known */}
+            <AnimatePresence>
+              {revealRarity && (
+                <motion.div
+                  key="tint"
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: `radial-gradient(ellipse 80% 60% at 50% 50%, ${RARITY_OVERLAY_TINT[revealRarity]}, transparent)`,
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.7 }}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Shake phase — escalating intensity */}
             <AnimatePresence>
               {showShake && openingBox && (
                 <motion.div
                   key="shake"
-                  className="relative flex flex-col items-center gap-8"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1, x: shakeKeyframes }}
-                  exit={{ scale: 1.2, opacity: 0 }}
-                  transition={{
-                    scale: { ...springBouncy },
-                    x: { duration: 0.7, ease: "easeInOut" },
-                    opacity: { duration: 0.15 },
-                  }}
+                  className="relative flex flex-col items-center gap-10 z-10"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 1.4, opacity: 0 }}
+                  transition={{ scale: springBouncy, opacity: { duration: 0.15 } }}
                 >
-                  <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                    <motion.span
-                      className="text-6xl"
-                      animate={{ rotate: [-8, 8, -6, 6, -4, 4, 0] }}
-                      transition={{ duration: 0.6, repeat: Infinity }}
+                  <div className="relative flex items-center justify-center">
+                    {/* Outer pulse ring */}
+                    <motion.div
+                      className="absolute w-48 h-48 rounded-full"
+                      style={{ background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%)" }}
+                      animate={{ scale: [1, 1.28, 1] }}
+                      transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    {/* Inner glow pulse */}
+                    <motion.div
+                      className="absolute w-36 h-36 rounded-full"
+                      style={{ boxShadow: "0 0 48px rgba(255,255,255,0.07)" }}
+                      animate={{ opacity: [0.3, 0.9, 0.3] }}
+                      transition={{ duration: 0.75, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    {/* Box — escalating shake from gentle to violent */}
+                    <motion.div
+                      className="relative w-32 h-32 rounded-full bg-white/5 backdrop-blur-md border border-white/10 flex items-center justify-center"
+                      animate={{
+                        x: [0, -3, 3, -3, 3, -7, 7, -11, 11, -15, 15, -11, 11, -7, 7, -3, 3, 0],
+                        rotate: [0, -1, 1, -2, 2, -3, 3, -5, 5, -4, 4, -2, 2, 0],
+                      }}
+                      transition={{ duration: 1.4, ease: "linear", delay: 0.25 }}
                     >
-                      {openingBox.emoji}
-                    </motion.span>
+                      <motion.span
+                        className="text-6xl select-none"
+                        animate={{ rotate: [-4, 4, -3, 3, -6, 6, -2, 2, 0] }}
+                        transition={{ duration: 1.2, ease: "linear", delay: 0.25 }}
+                      >
+                        {openingBox.emoji}
+                      </motion.span>
+                    </motion.div>
                   </div>
                   <motion.p
-                    className="text-white/60 text-sm font-medium"
-                    animate={{ opacity: [0.4, 1, 0.4] }}
+                    className="text-white/35 text-xs font-medium tracking-[0.14em] uppercase"
+                    animate={{ opacity: [0.2, 0.65, 0.2] }}
                     transition={{ duration: 1, repeat: Infinity }}
                   >
                     Ouverture en cours...
@@ -593,177 +716,154 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
               )}
             </AnimatePresence>
 
-            {/* Flash phase — white burst */}
+            {/* Rarity-colored flash */}
             <AnimatePresence>
               {showFlash && (
                 <motion.div
                   key="flash"
-                  className="absolute inset-0 bg-white"
-                  initial={{ opacity: 0.8 }}
-                  animate={{ opacity: 0 }}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{ background: RARITY_FLASH_COLORS[revealRarity || "common"] }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 1, 0.55, 0] }}
                   exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.34, ease: "easeOut" }}
                 />
               )}
             </AnimatePresence>
 
-            {/* Result phase — show card */}
+            {/* Result card — entrance varies by rarity */}
             <AnimatePresence>
-              {result && (
-                <motion.div
-                  key="result-card"
-                  className="relative w-full max-w-sm rounded-[40px] border p-10 flex flex-col items-center text-center gap-6"
-                  style={{
-                    background: "#FCFBFA",
-                    borderColor: `${result.rarityColor}44`,
-                  }}
-                  initial={{ scale: 0, rotate: -10 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  exit={{ scale: 0.8, opacity: 0 }}
-                  transition={springBouncy}
-                >
-                  {/* Particles */}
-                  {particles.map((p, idx) => (
+              {result && (() => {
+                const rarity = result.rolledRarity;
+                const cardInitial = RARITY_CARD_INITIAL[rarity] ?? RARITY_CARD_INITIAL.common;
+                const cardSpring = RARITY_CARD_SPRING[rarity] ?? RARITY_CARD_SPRING.common;
+                return (
+                  <motion.div
+                    key="result-card"
+                    className="relative w-full max-w-sm rounded-[40px] border p-10 flex flex-col items-center text-center gap-6 z-10"
+                    style={{
+                      background: "#FCFBFA",
+                      borderColor: `${result.rarityColor}44`,
+                      boxShadow: `0 0 60px ${result.rarityColor}20, 0 32px 64px rgba(0,0,0,0.45)`,
+                    }}
+                    initial={cardInitial}
+                    animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
+                    exit={{ scale: 0.85, opacity: 0 }}
+                    transition={cardSpring}
+                  >
+                    {/* Particles */}
+                    {particles.map((p, idx) => (
+                      <motion.div
+                        key={idx}
+                        className="absolute rounded-full pointer-events-none"
+                        style={{ width: p.size, height: p.size, background: p.color, left: "50%", top: "50%" }}
+                        initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
+                        animate={{ x: p.x, y: p.y - 100, opacity: 0, scale: 0, rotate: p.rotation }}
+                        transition={{ duration: p.duration, delay: p.delay, ease: "easeOut" }}
+                      />
+                    ))}
+
+                    {/* Close */}
+                    <button
+                      onClick={dismissResult}
+                      className="absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center bg-[#F3F0EE] hover:bg-[#E8E4E0]"
+                      aria-label="Fermer"
+                    >
+                      <X className="w-4 h-4 text-[#696969]" />
+                    </button>
+
+                    {/* Emoji with pulsing glow */}
                     <motion.div
-                      key={idx}
-                      className="absolute rounded-full pointer-events-none"
-                      style={{
-                        width: p.size,
-                        height: p.size,
-                        background: p.color,
-                        left: "50%",
-                        top: "50%",
-                      }}
-                      initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
-                      animate={{
-                        x: p.x,
-                        y: p.y - 100,
-                        opacity: 0,
-                        scale: 0,
-                        rotate: p.rotation,
-                      }}
+                      className="relative w-24 h-24 rounded-full flex items-center justify-center"
+                      initial={{ scale: 0, rotate: rarity === "unique" ? -180 : -90 }}
+                      animate={{ scale: 1, rotate: 0 }}
                       transition={{
-                        duration: p.duration,
-                        delay: p.delay,
-                        ease: "easeOut",
-                      }}
-                    />
-                  ))}
-
-                  {/* Close button */}
-                  <button
-                    onClick={dismissResult}
-                    className="absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center bg-[#F3F0EE] hover:bg-[#E8E4E0]"
-                    aria-label="Fermer"
-                  >
-                    <X className="w-4 h-4 text-[#696969]" />
-                  </button>
-
-                  {/* Rarity glow ring */}
-                  <motion.div
-                    className="w-24 h-24 rounded-full flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ ...springPop, delay: 0.1 }}
-                    style={{
-                      boxShadow: `0 0 40px ${result.rarityColor}44, 0 0 80px ${result.rarityColor}22`,
-                    }}
-                  >
-                    <motion.div
-                      className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
-                      initial={{ rotate: -90 }}
-                      animate={{ rotate: 0 }}
-                      transition={{ ...springPop, delay: 0.2 }}
-                      style={{
-                        background: `linear-gradient(135deg, ${result.rarityColor}, ${result.rarityColor}88)`,
+                        type: "spring",
+                        stiffness: rarity === "unique" ? 180 : 300,
+                        damping: rarity === "unique" ? 12 : 18,
+                        delay: 0.08,
                       }}
                     >
-                      {result.item.emoji}
+                      <motion.div
+                        className="absolute inset-0 rounded-full"
+                        animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.22, 1] }}
+                        transition={{ duration: rarity === "unique" ? 1.4 : 2, repeat: Infinity, ease: "easeInOut" }}
+                        style={{ boxShadow: `0 0 48px ${result.rarityColor}55, 0 0 96px ${result.rarityColor}22` }}
+                      />
+                      <div
+                        className="relative w-20 h-20 rounded-full flex items-center justify-center text-4xl z-10"
+                        style={{ background: `linear-gradient(135deg, ${result.rarityColor}, ${result.rarityColor}88)` }}
+                      >
+                        {result.item.emoji}
+                      </div>
                     </motion.div>
-                  </motion.div>
 
-                  {/* Pulsing glow on ring */}
-                  <motion.div
-                    className="absolute w-24 h-24 rounded-full pointer-events-none"
-                    style={{
-                      top: "calc(40px - 48px)",
-                      boxShadow: `0 0 60px ${result.rarityColor}66`,
-                    }}
-                    animate={{ opacity: [0.3, 0.8, 0.3] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  />
-
-                  {/* Details — staggered */}
-                  <motion.div
-                    className="space-y-2"
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                      visible: { transition: { staggerChildren: 0.1, delayChildren: 0.3 } },
-                    }}
-                  >
-                    <motion.span
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.06em]"
-                      style={{
-                        backgroundColor: `${result.rarityColor}22`,
-                        color: result.rarityColor,
-                        border: `1.5px solid ${result.rarityColor}44`,
-                      }}
-                      variants={{
-                        hidden: { opacity: 0, y: 10 },
-                        visible: { opacity: 1, y: 0 },
-                      }}
+                    {/* Details — staggered */}
+                    <motion.div
+                      className="space-y-2"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{ visible: { transition: { staggerChildren: 0.09, delayChildren: 0.22 } } }}
                     >
-                      <Sparkles className="w-3 h-3" />
-                      {RARITY_LABELS[result.rolledRarity] || result.rolledRarity}
-                    </motion.span>
-                    <motion.h3
-                      className="text-2xl font-medium tracking-[-0.02em] text-[#141413]"
-                      variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-                    >
-                      {result.item.name}
-                    </motion.h3>
-                    <motion.p
-                      className="text-sm text-[#696969] leading-relaxed max-w-xs"
-                      variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
-                    >
-                      {result.item.description}
-                    </motion.p>
-                    {result.item.base_value > 0 && (
-                      <motion.p
-                        className="text-xs text-[#696969]"
+                      <motion.span
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-[0.06em]"
+                        style={{
+                          backgroundColor: `${result.rarityColor}22`,
+                          color: result.rarityColor,
+                          border: `1.5px solid ${result.rarityColor}44`,
+                        }}
                         variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
                       >
-                        Valeur de base : {result.item.base_value.toLocaleString()} pts
+                        <Sparkles className="w-3 h-3" />
+                        {RARITY_LABELS[result.rolledRarity] || result.rolledRarity}
+                      </motion.span>
+                      <motion.h3
+                        className="text-2xl font-medium tracking-[-0.02em] text-[#141413]"
+                        variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                      >
+                        {result.item.name}
+                      </motion.h3>
+                      <motion.p
+                        className="text-sm text-[#696969] leading-relaxed max-w-xs"
+                        variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                      >
+                        {result.item.description}
                       </motion.p>
-                    )}
-                  </motion.div>
-
-                  {/* Fusionnable badge */}
-                  {result.item.category === "burger" && (
-                    <motion.div
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#F37338]/10 text-[#CF4500] text-xs font-medium"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.7, ...springGentle }}
-                    >
-                      <Star className="w-3 h-3" />
-                      Fusionnable (5 → 1★)
+                      {result.item.base_value > 0 && (
+                        <motion.p
+                          className="text-xs text-[#696969]"
+                          variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                        >
+                          Valeur de base : {result.item.base_value.toLocaleString()} pts
+                        </motion.p>
+                      )}
                     </motion.div>
-                  )}
 
-                  <motion.div
-                    className="w-full"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <Button className="ink-pill w-full" onClick={dismissResult}>
-                      Continuer
-                    </Button>
+                    {result.item.qualifyable && (
+                      <motion.div
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#F37338]/10 text-[#CF4500] text-xs font-medium"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.6, ...springGentle }}
+                      >
+                        <Star className="w-3 h-3" />
+                        Fusionnable (5→1★ / 2→★+)
+                      </motion.div>
+                    )}
+
+                    <motion.div
+                      className="w-full"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.42 }}
+                    >
+                      <Button className="ink-pill w-full" onClick={dismissResult}>
+                        Continuer
+                      </Button>
+                    </motion.div>
                   </motion.div>
-                </motion.div>
-              )}
+                );
+              })()}
             </AnimatePresence>
           </motion.div>
         )}
@@ -789,8 +889,92 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
         )}
       </AnimatePresence>
 
+      {/* ─── Daily Deals ─── */}
+      {dailyDeals.length > 0 && (
+        <section className="mb-16">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="w-5 h-5 text-[#F37338]" />
+              <h2 className="text-xl font-medium tracking-[-0.02em] text-[#141413]">Shop Éphémère</h2>
+            </div>
+            <span className="text-xs text-[#696969] tabular-nums">
+              Nouveau dans{" "}
+              {Math.floor(nextDealRefreshMs / 3600000)}h
+              {String(Math.floor((nextDealRefreshMs % 3600000) / 60000)).padStart(2, "0")}m
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {dailyDeals.map((deal) => {
+              const style = RARITY_CARD_STYLES[deal.rarity] || RARITY_CARD_STYLES.common;
+              const label = RARITY_LABELS[deal.rarity] || deal.rarity;
+              return (
+                <motion.div
+                  key={deal.id}
+                  className={`relative bg-[#FCFBFA] border-2 rounded-[24px] p-5 flex flex-col items-center text-center gap-3 halo-soft transition-all ${
+                    deal.purchased ? "opacity-50 border-gray-300" : style.border
+                  }`}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: deal.slot * 0.1, ...springGentle }}
+                >
+                  {deal.purchased && (
+                    <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#141413] text-[10px] font-bold text-[#F3F0EE] uppercase tracking-[0.04em]">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Acheté
+                    </span>
+                  )}
+
+                  <div
+                    className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl ${
+                      deal.purchased
+                        ? "bg-[#E8E4E0]"
+                        : `bg-gradient-to-br ${style.iconBg}`
+                    }`}
+                  >
+                    {deal.emoji}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-[#141413] leading-tight">{deal.name}</p>
+                    <span className={`text-[10px] font-bold uppercase tracking-[0.04em] ${style.text}`}>
+                      {label}
+                    </span>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F3F0EE] text-xs font-medium text-[#141413]">
+                    {deal.price.toLocaleString()} pts
+                  </div>
+
+                  {!deal.purchased && (
+                    <button
+                      onClick={() => handleBuyDeal(deal.id)}
+                      disabled={dealLoading === deal.id || player.nb_point < deal.price}
+                      className={`w-full py-2 rounded-full text-xs font-bold transition-all ${
+                        player.nb_point >= deal.price
+                          ? "bg-[#141413] text-[#F3F0EE] hover:bg-[#141413]/80"
+                          : "bg-[#E8E4E0] text-[#D1CDC7] cursor-not-allowed"
+                      } disabled:opacity-50`}
+                    >
+                      {dealLoading === deal.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin mx-auto" />
+                      ) : player.nb_point >= deal.price ? (
+                        "Acheter"
+                      ) : (
+                        "Pas assez de points"
+                      )}
+                    </button>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ─── Opening history ─── */}
-      <section className="pt-12 border-t border-[#D1CDC7]">
+      <section className="pt-12 pb-8 border-t border-[#D1CDC7]">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <Clock className="w-5 h-5 text-[#696969]" />

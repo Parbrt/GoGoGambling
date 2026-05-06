@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { formatCompactPoints } from "@/lib/utils";
 import { getChipValues } from "@/lib/blackjackGame";
 
 interface BlackjackBetChipsProps {
@@ -43,13 +44,13 @@ export function BlackjackBetChips({
         <span className="eyebrow">Place ta mise</span>
         <div className="flex items-baseline gap-1.5 mt-1">
           <span className="text-3xl font-medium text-[#141413] tabular-nums tracking-[-0.03em]">
-            {currentBet}
+{formatCompactPoints(currentBet)}
           </span>
           <span className="text-sm text-[#696969]">pts</span>
         </div>
         {currentPoints > 0 && (
           <span className="text-[11px] text-[#696969]">
-            Solde · <span className="font-semibold tabular-nums text-[#141413]">{currentPoints.toLocaleString()}</span> pts
+            Solde · <span className="font-semibold tabular-nums text-[#141413]">{formatCompactPoints(currentPoints)}</span> pts
           </span>
         )}
       </div>
@@ -118,7 +119,7 @@ export function BlackjackBetChips({
             : "bg-[#E8E4E0] text-[#696969] cursor-not-allowed"
         }`}
       >
-        {currentBet >= 10 ? `Miser ${currentBet} pts` : "Mise minimum 10 pts"}
+        {currentBet >= 10 ? `Miser ${formatCompactPoints(currentBet)} pts` : "Mise minimum 10 pts"}
       </motion.button>
     </motion.div>
   );

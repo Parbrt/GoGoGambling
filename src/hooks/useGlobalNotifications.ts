@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { useNotifications } from "@/context/NotificationContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { api } from "@/lib/api";
@@ -18,7 +19,7 @@ export function useGlobalNotifications({ currentUserId, currentPlayerName }: Use
       addNotification({
         type: "jackpot",
         title: "🎰 JACKPOT GAGNE !",
-        message: `${data.winner} vient de remporter ${data.amount.toLocaleString()} points a la machine a sous ! Le jackpot est reinitialise a 10,000 points.`,
+        message: `${data.winner} vient de remporter ${formatCompactPoints(data.amount)} points a la machine a sous ! Le jackpot est reinitialise a 10,000 points.`,
         duration: 10000,
       });
     },
@@ -33,7 +34,7 @@ export function useGlobalNotifications({ currentUserId, currentPlayerName }: Use
       addNotification({
         type: "info",
         title: "👶 Pari Baby Fight !",
-        message: `${data.playerName} a mise ${(data.amount as number).toLocaleString()} points sur ${babyName} ! Rejoignez le combat !`,
+        message: `${data.playerName} a mise ${formatCompactPoints(data.amount as number)} points sur ${babyName} ! Rejoignez le combat !`,
         duration: 6000,
       });
     },

@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { CHICKEN_STATS, createChicken, generatePopulation, calculateBets } from "@/lib/chickenGame";
 import { api } from "@/lib/api";
+import { formatCompactPoints } from "@/lib/utils";
 
 interface ChickenFightProps {
   userId: string;
@@ -209,7 +210,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
         {error && <div className="p-4 bg-destructive/10 text-destructive rounded-lg">{error}</div>}
 
         <div className="text-center">
-          <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{currentPoints}</span></p>
+          <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{formatCompactPoints(currentPoints)}</span></p>
         </div>
 
         <div className="flex items-center justify-center gap-3">
@@ -269,7 +270,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
                     <Badge variant="default" className="font-bold">{betInfo.displayA}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground text-center">
-                    Mises: {betInfo.betA} pts
+                    Mises: {formatCompactPoints(betInfo.betA)} pts
                   </div>
                   {selectedChicken === 1 && <div className="mt-2 text-center"><Badge variant="outline" className="border-primary text-primary">✓ Selectionne</Badge></div>}
                 </CardContent>
@@ -289,7 +290,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
                     <Badge variant="default" className="font-bold">{betInfo.displayB}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground text-center">
-                    Mises: {betInfo.betB} pts
+                    Mises: {formatCompactPoints(betInfo.betB)} pts
                   </div>
                   {selectedChicken === 2 && <div className="mt-2 text-center"><Badge variant="outline" className="border-primary text-primary">✓ Selectionne</Badge></div>}
                 </CardContent>
@@ -300,7 +301,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Montant de votre mise:</label>
-                  <Input type="number" min={0} max={currentPoints} value={betAmount} onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${currentPoints} points`} />
+                  <Input type="number" min={0} max={currentPoints} value={betAmount} onChange={(e) => handleBetChange(parseInt(e.target.value) || 0)} placeholder={`Max: ${formatCompactPoints(currentPoints)} points`} />
                 </div>
                 <div className="flex justify-between gap-2">
                   <Button variant="outline" onClick={() => handleBetChange(betAmount + 10)} className="flex-1">+10</Button>
@@ -313,7 +314,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
             )}
 
             <Button onClick={handleStartFight} disabled={!selectedChicken || betAmount <= 0 || betAmount > currentPoints || charges <= 0} className="w-full" size="lg">
-              {charges <= 0 ? "Aucune charge disponible" : selectedChicken && betAmount > 0 ? `Lancer le combat (${betAmount} points)` : "Selectionnez un poulet et une mise"}
+              {charges <= 0 ? "Aucune charge disponible" : selectedChicken && betAmount > 0 ? `Lancer le combat (${formatCompactPoints(betAmount)} points)` : "Selectionnez un poulet et une mise"}
             </Button>
           </>
         )}

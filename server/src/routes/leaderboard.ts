@@ -23,16 +23,20 @@ router.get("/", (_req, res) => {
         equipped_title.name AS equipped_title_name,
         equipped_title.rarity AS equipped_title_rarity,
         equipped_title.emoji AS equipped_title_emoji,
+        pi_title.display_style AS equipped_title_display_style,
+        pi_title.star_level AS equipped_title_star_level,
         equipped_object.name AS equipped_object_name,
         equipped_object.rarity AS equipped_object_rarity,
-        equipped_object.emoji AS equipped_object_emoji
+        equipped_object.emoji AS equipped_object_emoji,
+        pi_object.display_style AS equipped_object_display_style,
+        pi_object.star_level AS equipped_object_star_level
       FROM players p
       LEFT JOIN player_equipped pe ON pe.user_id = p.user_id
       LEFT JOIN player_inventory pi_title ON pi_title.id = pe.equipped_title_inventory_id
       LEFT JOIN items_catalog equipped_title ON equipped_title.id = pi_title.item_id
       LEFT JOIN player_inventory pi_object ON pi_object.id = pe.equipped_object_inventory_id
       LEFT JOIN items_catalog equipped_object ON equipped_object.id = pi_object.item_id
-      ORDER BY p.peak_net_worth DESC
+      ORDER BY p.nb_point DESC
     `)
     .all(`-${HEARTBEAT_TIMEOUT_SECONDS} seconds`);
 

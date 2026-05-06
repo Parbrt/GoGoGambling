@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, Wallet } from "lucide-react";
@@ -54,18 +55,18 @@ export function DebtManager({ player, onPlayerUpdate }: DebtManagerProps) {
       <div className="flex justify-between items-center">
         <div>
           <p className="text-sm text-[#696969]">Dette totale</p>
-          <p className="text-2xl font-medium tracking-[-0.02em] text-[#CF4500]">{player.nb_debt} pts</p>
+          <p className="text-2xl font-medium tracking-[-0.02em] text-[#CF4500]">{formatCompactPoints(player.nb_debt)} pts</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-[#696969]">Points disponibles</p>
-          <p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{player.nb_point} pts</p>
+          <p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{formatCompactPoints(player.nb_point)} pts</p>
         </div>
       </div>
 
       {player.nb_point > 0 ? (
         <div className="space-y-3">
           <label className="text-sm font-medium text-[#141413]">
-            Montant à rembourser (max: {maxRepayable} pts)
+            Montant à rembourser (max: {formatCompactPoints(maxRepayable)} pts)
           </label>
           <div className="flex gap-2">
             <Input

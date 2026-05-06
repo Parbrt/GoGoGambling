@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { DailyReward } from "@/components/DailyReward";
 import { ShareChart } from "@/components/ShareChart";
 import { RankBadge } from "@/components/RankBadge";
@@ -186,10 +187,10 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
-          <Stat label="Points" value={player.nb_point.toLocaleString()} tone={player.nb_point >= 0 ? "ink" : "alert"} />
-          <Stat label="Valeur actions" value={portfolio.totalValue.toFixed(0)} tone="link" />
-          <Stat label="Dettes" value={player.nb_debt.toLocaleString()} tone="alert" />
-          <Stat label="Patrimoine net" value={netWorth.toFixed(0)} tone={netWorth >= 0 ? "ink" : "alert"} />
+          <Stat label="Points" value={formatCompactPoints(player.nb_point)} tone={player.nb_point >= 0 ? "ink" : "alert"} />
+          <Stat label="Valeur actions" value={formatCompactPoints(portfolio.totalValue)} tone="link" />
+          <Stat label="Dettes" value={formatCompactPoints(player.nb_debt)} tone="alert" />
+          <Stat label="Patrimoine net" value={formatCompactPoints(netWorth)} tone={netWorth >= 0 ? "ink" : "alert"} />
         </div>
       </section>
 

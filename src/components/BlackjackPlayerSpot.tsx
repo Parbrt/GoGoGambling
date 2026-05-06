@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { formatCompactPoints } from "@/lib/utils";
 import { BlackjackHand } from "@/components/BlackjackHand";
 import type { PlayerState } from "@/lib/blackjackGame";
 
@@ -52,9 +53,9 @@ export function BlackjackPlayerSpot({
   const result = (() => {
     if (!player.result) return null;
     switch (player.result) {
-      case "win":       return { text: `+${player.winnings}`, tone: "win" };
-      case "blackjack": return { text: `BJ +${player.winnings}`, tone: "bj" };
-      case "lose":      return { text: `-${player.bet}`, tone: "lose" };
+      case "win":       return { text: `+${formatCompactPoints(player.winnings)}`, tone: "win" };
+      case "blackjack": return { text: `BJ +${formatCompactPoints(player.winnings)}`, tone: "bj" };
+      case "lose":      return { text: `-${formatCompactPoints(player.bet)}`, tone: "lose" };
       case "push":      return { text: "égalité", tone: "push" };
       case "left":      return { text: "parti", tone: "muted" };
       default:          return null;
@@ -126,7 +127,7 @@ export function BlackjackPlayerSpot({
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
           className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#F3F0EE] border border-[#E8E4E0]"
         >
-          <span className="text-[11px] font-bold text-[#141413] tabular-nums">{player.bet}</span>
+          <span className="text-[11px] font-bold text-[#141413] tabular-nums">{formatCompactPoints(player.bet)}</span>
           <span className="text-[9px] text-[#696969] font-medium">pts</span>
         </motion.div>
       )}

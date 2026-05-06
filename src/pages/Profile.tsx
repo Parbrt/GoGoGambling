@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { cacheGet } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -232,19 +233,19 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-6">
             <div className="space-y-1.5">
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Points</p>
-              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${player.nb_point >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{player.nb_point}</p>
+              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${player.nb_point >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{formatCompactPoints(player.nb_point)}</p>
             </div>
             <div className="space-y-1.5">
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Valeur actions</p>
-              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#3860BE] tabular-nums">{portfolio.totalValue.toFixed(0)}</p>
+              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#3860BE] tabular-nums">{formatCompactPoints(portfolio.totalValue)}</p>
             </div>
             <div className="space-y-1.5">
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Dettes</p>
-              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#CF4500] tabular-nums">{player.nb_debt}</p>
+              <p className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#CF4500] tabular-nums">{formatCompactPoints(player.nb_debt)}</p>
             </div>
             <div className="space-y-1.5">
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Patrimoine net</p>
-              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${netWorth >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{netWorth.toFixed(0)}</p>
+              <p className={`text-3xl md:text-4xl font-medium tracking-[-0.03em] tabular-nums ${netWorth >= 0 ? "text-[#141413]" : "text-[#CF4500]"}`}>{formatCompactPoints(netWorth)}</p>
             </div>
           </div>
         </div>
@@ -342,7 +343,7 @@ export function Profile({ player, onPlayerUpdate }: ProfileProps) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-[#696969]">Points disponibles</p>
-                  <p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{player.nb_point} pts</p>
+                  <p className="text-xl font-medium tracking-[-0.02em] text-[#141413]">{formatCompactPoints(player.nb_point)} pts</p>
                 </div>
               </div>
               {player.nb_point > 0 ? (

@@ -13,6 +13,29 @@ import type {
 
 const router = Router();
 
+// ─── Display style rolling ───────────────────────────────────────
+
+const STYLE_POOLS: Record<string, [string, number][]> = {
+  common:    [["default",70],["bold",20],["italic",10]],
+  rare:      [["default",50],["bold",20],["italic",15],["tinted",15]],
+  epic:      [["default",40],["bold",15],["italic",15],["tinted",15],["underline",15]],
+  legendary: [["default",30],["bold_italic",15],["tinted",15],["glow",15],["underline",15],["strikethrough",10]],
+  mythic:    [["default",20],["tinted",15],["glow",15],["solid",15],["italic",15],["gradient",10],["outlined",10]],
+  exotic:    [["default",20],["glow",15],["tinted_bold",15],["solid",15],["bold_italic",15],["gradient",10],["strikethrough",10]],
+  unique:    [["glow",15],["gradient",15],["solid",15],["rainbow",15],["tinted_bold",15],["bold_italic",10],["outlined",10],["glow_bold",5]],
+};
+
+function rollDisplayStyle(rarity: string): string {
+  const pool = STYLE_POOLS[rarity] ?? STYLE_POOLS.common;
+  const total = pool.reduce((sum, [, w]) => sum + w, 0);
+  let rand = Math.random() * total;
+  for (const [style, weight] of pool) {
+    rand -= weight;
+    if (rand <= 0) return style;
+  }
+  return "default";
+}
+
 // ─── Box opening ────────────────────────────────────────────────
 
 router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
@@ -109,7 +132,7 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       db.prepare("UPDATE players SET loto_tickets = loto_tickets + 1 WHERE user_id = ?").run(req.userId!);
     } else {
       // Normal inventory item — add to player_inventory
-      // Check if player already has this item (same item_id, same star_level)
+      const displayStyle = rollDisplayStyle(catalogItem.rarity);
       const existing = db
         .prepare(
           "SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0"
@@ -117,13 +140,13 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
         .get(req.userId!, catalogItem.id) as { id: number; quantity: number } | undefined;
 
       if (existing) {
-        db.prepare("UPDATE player_inventory SET quantity = quantity + 1 WHERE id = ?").run(
-          existing.id
+        db.prepare("UPDATE player_inventory SET quantity = quantity + 1, display_style = ? WHERE id = ?").run(
+          displayStyle, existing.id
         );
       } else {
         db.prepare(
-          "INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, 0)"
-        ).run(req.userId!, catalogItem.id);
+          "INSERT INTO player_inventory (user_id, item_id, quantity, star_level, display_style) VALUES (?, ?, 1, 0, ?)"
+        ).run(req.userId!, catalogItem.id, displayStyle);
       }
     }
 
@@ -373,15 +396,22 @@ router.post("/fuse", authMiddleware, (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    if (source.quantity < 5) {
+    const MAX_STAR = 5;
+    if (source.star_level >= MAX_STAR) {
+      res.status(400).json({ error: `Niveau ${"★".repeat(source.star_level)} maximum atteint` });
+      return;
+    }
+
+    // 5 copies for 0★→1★, 2 copies for each subsequent level
+    const required = source.star_level === 0 ? 5 : 2;
+    if (source.quantity < required) {
       res.status(400).json({
-        error: `Il vous faut 5 exemplaires pour fusionner. Vous en avez ${source.quantity}.`,
+        error: `Il vous faut ${required} exemplaire${required > 1 ? "s" : ""} pour fusionner. Vous en avez ${source.quantity}.`,
       });
       return;
     }
 
-    // Consume 5, create starred version
-    const newQuantity = source.quantity - 5;
+    const newQuantity = source.quantity - required;
     const newStarLevel = source.star_level + 1;
 
     if (newQuantity <= 0) {
@@ -395,9 +425,25 @@ router.post("/fuse", authMiddleware, (req: AuthenticatedRequest, res) => {
     }
 
     // Add the starred version
-    db.prepare(
+    const insertResult = db.prepare(
       "INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, ?)"
     ).run(userId, source.item_id, newStarLevel);
+    const newInventoryId = Number(insertResult.lastInsertRowid);
+
+    // If the old row was equipped, update player_equipped to point to the new fused row
+    const wasEquipped = db
+      .prepare(
+        "SELECT * FROM player_equipped WHERE user_id = ? AND (equipped_title_inventory_id = ? OR equipped_object_inventory_id = ?)"
+      )
+      .get(userId, inventoryId, inventoryId) as PlayerEquipped | undefined;
+    if (wasEquipped) {
+      if (wasEquipped.equipped_title_inventory_id === inventoryId) {
+        db.prepare("UPDATE player_equipped SET equipped_title_inventory_id = ? WHERE user_id = ?").run(newInventoryId, userId);
+      }
+      if (wasEquipped.equipped_object_inventory_id === inventoryId) {
+        db.prepare("UPDATE player_equipped SET equipped_object_inventory_id = ? WHERE user_id = ?").run(newInventoryId, userId);
+      }
+    }
 
     res.json({
       success: true,
@@ -773,15 +819,16 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       }
       db.prepare("UPDATE players SET loto_tickets = loto_tickets + 1 WHERE user_id = ?").run(userId);
     } else {
+      const displayStyle = rollDisplayStyle(catalogItem.rarity);
       const existing = db
         .prepare("SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0")
         .get(userId, catalogItem.id) as { id: number; quantity: number } | undefined;
 
       if (existing) {
-        db.prepare("UPDATE player_inventory SET quantity = quantity + 1 WHERE id = ?").run(existing.id);
+        db.prepare("UPDATE player_inventory SET quantity = quantity + 1, display_style = ? WHERE id = ?").run(displayStyle, existing.id);
       } else {
-        db.prepare("INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, 0)")
-          .run(userId, catalogItem.id);
+        db.prepare("INSERT INTO player_inventory (user_id, item_id, quantity, star_level, display_style) VALUES (?, ?, 1, 0, ?)")
+          .run(userId, catalogItem.id, displayStyle);
       }
     }
 
@@ -859,6 +906,51 @@ router.post("/use-consumable", authMiddleware, (req: AuthenticatedRequest, res) 
         "UPDATE players SET chicken_charges = 5, last_chicken_charge_refill = ? WHERE user_id = ?"
       ).run(new Date().toISOString(), userId);
       effectMessage = "Toutes vos charges de poulet ont été restaurées !";
+    } else if (source.name === "Ticket de Loto") {
+      // Convert inventory loto ticket into playable v2 ticket
+      const now = new Date();
+      const DRAW_HOUR = 12;
+      const DRAW_MINUTE = 0;
+      const drawTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), DRAW_HOUR, DRAW_MINUTE);
+
+      if (now >= drawTime) {
+        res.status(400).json({ error: "Les tickets ne peuvent plus être utilisés pour le tirage du jour. Revenez après midi." });
+        return;
+      }
+
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+      const ticketCount = (db
+        .prepare("SELECT COUNT(*) as cnt FROM loto_tickets_v2 WHERE user_id = ? AND draw_date = ?")
+        .get(userId, todayStr) as { cnt: number }).cnt;
+
+      if (ticketCount >= 10) {
+        res.status(400).json({ error: "Maximum 10 tickets par tirage" });
+        return;
+      }
+
+      // Generate unique ticket number for this draw
+      let ticketNumber: string;
+      let attempts = 0;
+      do {
+        ticketNumber = String(Math.floor(Math.random() * 100000)).padStart(5, "0");
+        const exists = db
+          .prepare("SELECT id FROM loto_tickets_v2 WHERE ticket_number = ? AND draw_date = ?")
+          .get(ticketNumber, todayStr);
+        if (!exists) break;
+        attempts++;
+      } while (attempts < 50);
+
+      if (attempts >= 50) {
+        res.status(500).json({ error: "Impossible de générer un numéro unique. Réessayez." });
+        return;
+      }
+
+      db.prepare(
+        "INSERT INTO loto_tickets_v2 (user_id, player_name, ticket_number, draw_date) VALUES (?, ?, ?, ?)"
+      ).run(userId, player.player_name, ticketNumber, todayStr);
+
+      effectMessage = `Ticket de Loto n°${ticketNumber} activé pour le tirage du jour !`;
     } else {
       res.status(400).json({ error: "Ce consommable ne peut pas être utilisé ici" });
       return;
@@ -883,6 +975,237 @@ router.post("/use-consumable", authMiddleware, (req: AuthenticatedRequest, res) 
     });
   } catch (err) {
     console.error("[shop] Erreur use-consumable:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── Daily Deals ─────────────────────────────────────────────────
+
+function getTodayDealDateStr(): string {
+  const now = new Date();
+  const todayAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
+  if (now < todayAt9) {
+    todayAt9.setDate(todayAt9.getDate() - 1);
+  }
+  return todayAt9.toISOString().slice(0, 10);
+}
+
+function seedDailyDeals(db: ReturnType<typeof getDb>, dateStr: string): void {
+  const existing = db.prepare("SELECT COUNT(*) as cnt FROM daily_deals WHERE deal_date = ?").get(dateStr) as { cnt: number };
+  if (existing.cnt > 0) return;
+
+  function mulberry32(seed: number): () => number {
+    let s = seed | 0;
+    return () => {
+      s = (s + 0x6D2B79F5) | 0;
+      let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const seed = dateStr.split("-").reduce((acc, n) => acc * 31 + parseInt(n, 10), 0);
+  const rand = mulberry32(seed);
+
+  const RARITY_WEIGHTS: Array<{ rarity: string; weight: number }> = [
+    { rarity: "common", weight: 55 },
+    { rarity: "rare", weight: 28 },
+    { rarity: "epic", weight: 10 },
+    { rarity: "legendary", weight: 4 },
+    { rarity: "mythic", weight: 2 },
+    { rarity: "exotic", weight: 1 },
+  ];
+  const totalWeight = RARITY_WEIGHTS.reduce((s, r) => s + r.weight, 0);
+
+  function pickWeightedRarity(): string {
+    const roll = rand() * totalWeight;
+    let cumul = 0;
+    for (const r of RARITY_WEIGHTS) {
+      cumul += r.weight;
+      if (roll < cumul) return r.rarity;
+    }
+    return "common";
+  }
+
+  const eligibleItems = db
+    .prepare(
+      `SELECT * FROM items_catalog
+       WHERE rarity != 'unique'
+       AND category NOT IN ('consumable', 'stock', 'points', 'loto_ticket')
+       ORDER BY name`
+    )
+    .all() as Array<{ id: number; name: string; category: string; rarity: string; base_value: number; emoji: string }>;
+
+  const consumableItems = db
+    .prepare("SELECT * FROM items_catalog WHERE category IN ('consumable', 'loto_ticket')")
+    .all() as Array<{ id: number; name: string; category: string; rarity: string; base_value: number; emoji: string }>;
+
+  if (eligibleItems.length === 0) return;
+
+  const insert = db.prepare(
+    "INSERT INTO daily_deals (deal_date, slot, item_id, price) VALUES (?, ?, ?, ?)"
+  );
+
+  const transaction = db.transaction(() => {
+    for (let slot = 1; slot <= 2; slot++) {
+      const targetRarity = pickWeightedRarity();
+      const candidates = eligibleItems.filter((i) => i.rarity === targetRarity);
+      const pool = candidates.length > 0 ? candidates : eligibleItems;
+      const picked = pool[Math.floor(rand() * pool.length)];
+      const price = Math.ceil(picked.base_value * 1.2);
+      insert.run(dateStr, slot, picked.id, price > 0 ? price : 100);
+    }
+
+    if (consumableItems.length > 0) {
+      const consumable = consumableItems[Math.floor(rand() * consumableItems.length)];
+      const price = Math.ceil(consumable.base_value * 1.2);
+      insert.run(dateStr, 3, consumable.id, price > 0 ? price : 100);
+    }
+  });
+
+  transaction();
+}
+
+router.get("/daily-deals", authMiddleware, (req: AuthenticatedRequest, res) => {
+  try {
+    const db = getDb();
+    const today = getTodayDealDateStr();
+    seedDailyDeals(db, today);
+
+    const deals = db
+      .prepare(
+        `SELECT dd.*, ic.name, ic.category, ic.rarity, ic.base_value, ic.emoji, ic.description
+         FROM daily_deals dd
+         JOIN items_catalog ic ON dd.item_id = ic.id
+         WHERE dd.deal_date = ?
+         ORDER BY dd.slot`
+      )
+      .all(today) as Array<{
+        id: number; deal_date: string; slot: number; item_id: number; price: number;
+        name: string; category: string; rarity: string; base_value: number; emoji: string; description: string;
+      }>;
+
+    const purchases = db
+      .prepare(
+        `SELECT deal_id FROM daily_deal_purchases ddp
+         JOIN daily_deals dd ON ddp.deal_id = dd.id
+         WHERE dd.deal_date = ? AND ddp.user_id = ?`
+      )
+      .all(today, req.userId!) as Array<{ deal_id: number }>;
+    const purchasedIds = new Set(purchases.map((p) => p.deal_id));
+
+    const now = new Date();
+    const tomorrowAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
+    const nextRefreshMs = tomorrowAt9.getTime() - now.getTime();
+
+    res.json({
+      deals: deals.map((d) => ({ ...d, purchased: purchasedIds.has(d.id) })),
+      nextRefreshMs,
+    });
+  } catch (err) {
+    console.error("[shop] Erreur daily-deals:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+router.post("/buy-daily-deal", authMiddleware, (req: AuthenticatedRequest, res) => {
+  try {
+    const { dealId } = req.body as { dealId: number };
+
+    if (!dealId) {
+      res.status(400).json({ error: "ID du deal requis" });
+      return;
+    }
+
+    const db = getDb();
+    const userId = req.userId!;
+    const today = getTodayDealDateStr();
+
+    const deal = db
+      .prepare(
+        `SELECT dd.*, ic.name, ic.category, ic.rarity, ic.emoji
+         FROM daily_deals dd
+         JOIN items_catalog ic ON dd.item_id = ic.id
+         WHERE dd.id = ? AND dd.deal_date = ?`
+      )
+      .get(dealId, today) as {
+        id: number; item_id: number; price: number; slot: number;
+        name: string; category: string; rarity: string; emoji: string;
+      } | undefined;
+
+    if (!deal) {
+      res.status(404).json({ error: "Deal introuvable ou expiré" });
+      return;
+    }
+
+    const alreadyPurchased = db
+      .prepare("SELECT id FROM daily_deal_purchases WHERE user_id = ? AND deal_id = ?")
+      .get(userId, dealId);
+
+    if (alreadyPurchased) {
+      res.status(400).json({ error: "Vous avez déjà acheté cet article aujourd'hui" });
+      return;
+    }
+
+    const player = db
+      .prepare("SELECT * FROM players WHERE user_id = ?")
+      .get(userId) as Player | undefined;
+
+    if (!player) {
+      res.status(404).json({ error: "Joueur introuvable" });
+      return;
+    }
+
+    if (player.nb_point < deal.price) {
+      res.status(400).json({
+        error: `Pas assez de points. Il vous faut ${deal.price.toLocaleString()} points.`,
+      });
+      return;
+    }
+
+    db.prepare("UPDATE players SET nb_point = nb_point - ? WHERE user_id = ?")
+      .run(deal.price, userId);
+
+    if (deal.name === "Ticket de Loto") {
+      const existing = db
+        .prepare("SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0")
+        .get(userId, deal.item_id) as { id: number; quantity: number } | undefined;
+
+      if (existing) {
+        db.prepare("UPDATE player_inventory SET quantity = quantity + 1 WHERE id = ?").run(existing.id);
+      } else {
+        db.prepare("INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, 0)")
+          .run(userId, deal.item_id);
+      }
+      db.prepare("UPDATE players SET loto_tickets = loto_tickets + 1 WHERE user_id = ?").run(userId);
+    } else {
+      const existing = db
+        .prepare("SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0")
+        .get(userId, deal.item_id) as { id: number; quantity: number } | undefined;
+
+      if (existing) {
+        db.prepare("UPDATE player_inventory SET quantity = quantity + 1 WHERE id = ?").run(existing.id);
+      } else {
+        db.prepare("INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, 0)")
+          .run(userId, deal.item_id);
+      }
+    }
+
+    db.prepare("INSERT INTO daily_deal_purchases (user_id, deal_id) VALUES (?, ?)").run(userId, dealId);
+
+    updatePeakNetWorth(userId);
+
+    const updatedPlayer = db
+      .prepare("SELECT * FROM players WHERE user_id = ?")
+      .get(userId) as Player;
+
+    res.json({
+      success: true,
+      player: updatedPlayer,
+      deal: { id: deal.id, name: deal.name, price: deal.price, emoji: deal.emoji, rarity: deal.rarity },
+    });
+  } catch (err) {
+    console.error("[shop] Erreur buy-daily-deal:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

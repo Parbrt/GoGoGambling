@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Star, Shield, Shirt, Sparkles, Loader2, Swords, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/lib/api";
+import { RARITY_HEX, getStyleDef } from "@/lib/displayStyles";
 
 // ─── Types ───
 
@@ -19,6 +20,7 @@ interface InventoryItem {
   qualifyable: number;
   emoji: string;
   description: string;
+  display_style: string;
 }
 
 interface EquippedData {
@@ -159,6 +161,14 @@ export function Inventory() {
     return acc;
   }, {});
 
+  // ─── Fusion helper ───
+
+  function getFuseReq(starLevel: number): number {
+    return starLevel === 0 ? 5 : 2;
+  }
+
+  const MAX_STAR = 5;
+
   const displayItems = Object.values(itemGroups).map((group) => ({
     ...group[0],
     quantity: group.reduce((sum, i) => sum + i.quantity, 0),
@@ -208,7 +218,16 @@ export function Inventory() {
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Titre</p>
               {equipped.equipped_title ? (
                 <>
-                  <p className="font-medium text-[#141413] truncate">{equipped.equipped_title.name}</p>
+                  <p className="font-medium text-[#141413] truncate">
+                    {equipped.equipped_title.name}
+                    {equipped.equipped_title.star_level > 0 && (
+                      <span className="inline-flex items-center gap-0.5 ml-1.5">
+                        {Array.from({ length: equipped.equipped_title.star_level }).map((_, i) => (
+                          <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        ))}
+                      </span>
+                    )}
+                  </p>
                   <p className={`text-xs font-medium ${RARITY_STYLES[equipped.equipped_title.rarity]?.text || "text-gray-400"}`}>
                     {RARITY_LABELS[equipped.equipped_title.rarity]}
                   </p>
@@ -236,7 +255,16 @@ export function Inventory() {
               <p className="text-xs uppercase tracking-[0.08em] text-[#696969] font-medium">Objet</p>
               {equipped.equipped_object ? (
                 <>
-                  <p className="font-medium text-[#141413] truncate">{equipped.equipped_object.name}</p>
+                  <p className="font-medium text-[#141413] truncate">
+                    {equipped.equipped_object.name}
+                    {equipped.equipped_object.star_level > 0 && (
+                      <span className="inline-flex items-center gap-0.5 ml-1.5">
+                        {Array.from({ length: equipped.equipped_object.star_level }).map((_, i) => (
+                          <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        ))}
+                      </span>
+                    )}
+                  </p>
                   <p className={`text-xs font-medium ${RARITY_STYLES[equipped.equipped_object.rarity]?.text || "text-gray-400"}`}>
                     {RARITY_LABELS[equipped.equipped_object.rarity]}
                   </p>
@@ -297,7 +325,8 @@ export function Inventory() {
 
               const canEquipTitle = item.category === "title";
               const canEquipObject = ["people", "fruit", "burger"].includes(item.category);
-              const canFuse = item.qualifyable && item.quantity >= 5 && item.star_level < 3;
+              const fuseReq = getFuseReq(item.star_level);
+              const canFuse = item.qualifyable && item.quantity >= fuseReq && item.star_level < MAX_STAR;
               const isConsumable = item.category === "consumable" || item.category === "loto_ticket";
 
               return (
@@ -339,6 +368,23 @@ export function Inventory() {
                     {RARITY_LABELS[item.rarity]}
                   </span>
 
+                  {/* Display style preview — shown for equippable items with a non-default variant */}
+                  {(canEquipTitle || canEquipObject) && item.display_style && item.display_style !== "default" && (() => {
+                    const hex = RARITY_HEX[item.rarity] ?? RARITY_HEX.common;
+                    const sd = getStyleDef(item.display_style);
+                    return (
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded-[999px] max-w-full truncate"
+                        style={sd.container(hex)}
+                        title={`Variante : ${item.display_style}`}
+                      >
+                        <span className={sd.textClass} style={{ ...sd.textStyle(hex), fontSize: "9px" }}>
+                          {item.name}
+                        </span>
+                      </span>
+                    );
+                  })()}
+
                   {/* Quantity */}
                   {item.quantity > 1 && (
                     <span className="text-[10px] tabular-nums text-[#696969] bg-[#F3F0EE] rounded-full px-2 py-0.5">
@@ -377,13 +423,14 @@ export function Inventory() {
                         onClick={() => handleFuse(item.inventoryIds[0])}
                         disabled={fusingId === item.inventoryIds[0]}
                         className="text-[10px] font-medium px-2 py-1 rounded-full bg-[#F37338]/10 text-[#CF4500] hover:bg-[#F37338]/20 transition-colors disabled:opacity-50"
+                        title={`${fuseReq} → ${item.star_level + 1}★`}
                       >
                         {fusingId === item.inventoryIds[0] ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
                           <>
                             <Swords className="w-3 h-3 inline mr-0.5" />
-                            Fusionner
+                            {fuseReq}→{item.star_level + 1}★
                           </>
                         )}
                       </button>

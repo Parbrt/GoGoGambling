@@ -325,6 +325,7 @@ export const api = {
           base_value: number;
           emoji: string;
           description: string;
+          qualifyable: number;
         };
         rolledRarity: string;
         rarityColor: string;
@@ -378,6 +379,30 @@ export const api = {
         player: PlayerType;
         item_name: string;
       }>("/api/shop/use-consumable", { inventoryId }),
+    dailyDeals: () =>
+      get<{
+        deals: Array<{
+          id: number;
+          deal_date: string;
+          slot: number;
+          item_id: number;
+          price: number;
+          name: string;
+          category: string;
+          rarity: string;
+          base_value: number;
+          emoji: string;
+          description: string;
+          purchased: boolean;
+        }>;
+        nextRefreshMs: number;
+      }>("/api/shop/daily-deals"),
+    buyDailyDeal: (dealId: number) =>
+      post<{
+        success: boolean;
+        player: PlayerType;
+        deal: { id: number; name: string; price: number; emoji: string; rarity: string };
+      }>("/api/shop/buy-daily-deal", { dealId }),
     marketplace: {
       list: (inventoryId: number, quantity: number, price: number) =>
         post<{ success: boolean; listingId: number }>("/api/shop/marketplace/list", {

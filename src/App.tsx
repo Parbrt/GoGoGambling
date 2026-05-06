@@ -36,7 +36,7 @@ import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
 import { useBlackjackNotifications } from "@/hooks/useBlackjackNotifications";
 import { useMarketplaceNotifications } from "@/hooks/useMarketplaceNotifications";
 
-const INIT_TIMEOUT = 3000;
+const INIT_TIMEOUT = 10000;
 
 function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
   user: User;

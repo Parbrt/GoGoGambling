@@ -49,7 +49,7 @@ export const LOOT_BOXES: BoxDefinition[] = [
     emoji: "🎰",
     description: "La box ultime pour les high-rollers. Chance de drop unique !",
     probabilities: {
-      unique: 0.5, exotic: 2.5, mythic: 17, legendary: 30, epic: 50,
+      unique: 1, exotic: 3, mythic: 16, legendary: 30, epic: 50,
       rare: 0, common: 0,
     },
   },

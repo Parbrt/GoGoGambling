@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCompactPoints } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
@@ -112,7 +113,7 @@ export function FightResult({ result }: FightResultProps) {
                 >
                   <span className="font-medium truncate mr-2">{r.playerName}</span>
                   <span className={r.won ? "text-green-700 font-bold" : "text-red-500"}>
-                    {r.won ? `+${r.winnings.toLocaleString()}` : `-${r.betAmount.toLocaleString()}`} pts
+                    {r.won ? `+${formatCompactPoints(r.winnings)}` : `-${formatCompactPoints(r.betAmount)}`} pts
                   </span>
                 </div>
               ))}

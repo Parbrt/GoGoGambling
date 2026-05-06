@@ -1,4 +1,5 @@
 import { useBabyFight } from "@/hooks/useBabyFight";
+import { formatCompactPoints } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import type { PlayerType } from "@/types";
@@ -80,7 +81,7 @@ export function BabyFight({ player, onPlayerUpdate }: BabyFightProps) {
 
         <div className="text-center">
           <p className="text-lg">
-            Vos points: <span className="font-bold text-[#F37338] text-xl">{playerPoints.toLocaleString()}</span>
+            Vos points: <span className="font-bold text-[#F37338] text-xl">{formatCompactPoints(playerPoints)}</span>
           </p>
         </div>
 

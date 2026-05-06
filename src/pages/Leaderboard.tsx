@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { formatCompactPoints } from "@/lib/utils";
 import { motion } from "motion/react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import { api } from "@/lib/api";
 import { cacheGet, cacheHas } from "@/lib/cache";
 import { getRankInfo } from "@/lib/ranks";
+import { RARITY_HEX, getStyleDef } from "@/lib/displayStyles";
 import { PlayerCard } from "@/components/PlayerCard";
 import type { PlayerType } from "@/types";
 
@@ -11,20 +13,25 @@ interface LeaderboardPlayer extends PlayerType {
   equipped_title_name: string | null;
   equipped_title_rarity: string | null;
   equipped_title_emoji: string | null;
+  equipped_title_display_style: string | null;
+  equipped_title_star_level: number | null;
   equipped_object_name: string | null;
   equipped_object_rarity: string | null;
   equipped_object_emoji: string | null;
+  equipped_object_display_style: string | null;
+  equipped_object_star_level: number | null;
 }
 
-const RARITY_TEXT: Record<string, string> = {
-  unique: "text-yellow-400",
-  exotic: "text-red-500",
-  mythic: "text-fuchsia-500",
-  legendary: "text-orange-500",
-  epic: "text-purple-500",
-  rare: "text-blue-500",
-  common: "text-gray-400",
-};
+function StarBadge({ level }: { level: number }) {
+  if (level <= 0) return null;
+  return (
+    <span className="inline-flex items-center gap-0.5 ml-1">
+      {Array.from({ length: level }).map((_, i) => (
+        <Star key={i} className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+      ))}
+    </span>
+  );
+}
 
 const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const;
 const POLL_INTERVAL = 10000;
@@ -172,36 +179,51 @@ export function Leaderboard() {
                           {p.player_name}
                         </button>
                         <div className="flex flex-col items-start gap-0.5 mt-1">
-                          {p.equipped_title_name && (
-                            <motion.div
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: rowDelay + 0.15, duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-                            >
-                              <span
-                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[999px] bg-white border border-[#D1CDC7]/50 text-[10px] font-bold uppercase tracking-[0.03em] max-w-[140px] truncate ${RARITY_TEXT[p.equipped_title_rarity || ""] || "text-gray-400"}`}
-                                title={p.equipped_title_name}
+                          {p.equipped_title_name && (() => {
+                            const hex = RARITY_HEX[p.equipped_title_rarity || ""] ?? RARITY_HEX.common;
+                            const sd = getStyleDef(p.equipped_title_display_style);
+                            return (
+                              <motion.div
+                                initial={{ opacity: 0, x: -6 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: rowDelay + 0.15, duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
                               >
-                                {p.equipped_title_emoji && <span className="text-sm leading-none">{p.equipped_title_emoji}</span>}
-                                {p.equipped_title_name}
-                              </span>
-                            </motion.div>
-                          )}
-                          {p.equipped_object_emoji && (
-                            <motion.div
-                              initial={{ opacity: 0, x: -6 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: rowDelay + 0.25, duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-                            >
-                              <span
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[999px] bg-white border border-[#D1CDC7]/50 text-[10px] font-medium text-[#141413] tracking-[-0.01em] max-w-[140px] truncate"
-                                title={p.equipped_object_name ?? ""}
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[999px] max-w-[140px] truncate"
+                                  style={sd.container(hex)}
+                                  title={p.equipped_title_name}
+                                >
+                                  <span className={sd.textClass} style={sd.textStyle(hex)}>
+                                    {p.equipped_title_name}
+                                  </span>
+                                  <StarBadge level={p.equipped_title_star_level ?? 0} />
+                                </span>
+                              </motion.div>
+                            );
+                          })()}
+                          {p.equipped_object_emoji && (() => {
+                            const sd = getStyleDef(p.equipped_object_display_style);
+                            const hex = RARITY_HEX[p.equipped_object_rarity || ""] ?? RARITY_HEX.common;
+                            return (
+                              <motion.div
+                                initial={{ opacity: 0, x: -6 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: rowDelay + 0.25, duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
                               >
-                                <span className="text-sm leading-none">{p.equipped_object_emoji}</span>
-                                {p.equipped_object_name}
-                              </span>
-                            </motion.div>
-                          )}
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[999px] max-w-[140px] truncate"
+                                  style={sd.container(hex)}
+                                  title={p.equipped_object_name ?? ""}
+                                >
+                                  <span className="text-sm leading-none">{p.equipped_object_emoji}</span>
+                                  <span className={sd.textClass} style={sd.textStyle(hex)}>
+                                    {p.equipped_object_name}
+                                  </span>
+                                  <StarBadge level={p.equipped_object_star_level ?? 0} />
+                                </span>
+                              </motion.div>
+                            );
+                          })()}
                           <p className="text-[11px] text-[#696969] tracking-[-0.01em]">{rankInfo.title} — Niv.{rankInfo.level}</p>
                         </div>
                       </div>
@@ -209,7 +231,7 @@ export function Leaderboard() {
                     <div className="flex items-center gap-3">
                       {p.nb_share_A > 0 && <span className="inline-flex text-xs font-medium text-[#3860BE] bg-white border border-[#3860BE]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_A} GCC</span>}
                       {p.nb_share_B > 0 && <span className="inline-flex text-xs font-medium text-[#9A3A0A] bg-white border border-[#9A3A0A]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_B} GC</span>}
-                      <span className="text-xl font-medium text-[#141413] tracking-[-0.03em] tabular-nums">{p.nb_point.toLocaleString()}</span>
+                      <span className="text-xl font-medium text-[#141413] tracking-[-0.03em] tabular-nums">{formatCompactPoints(p.nb_point)}</span>
                       <span className="text-xs uppercase tracking-[0.08em] text-[#696969] hidden sm:inline">pts</span>
                     </div>
                   </motion.div>
@@ -228,22 +250,31 @@ function SatelliteBadge({
   name,
   rarity,
   type,
+  displayStyle,
+  starLevel = 0,
 }: {
   emoji: string;
   name: string;
   rarity: string | null;
   type: "title" | "object";
+  displayStyle?: string | null;
+  starLevel?: number;
 }) {
-  const color = type === "title" ? (RARITY_TEXT[rarity || ""] || "text-gray-400") : "text-[#141413]";
+  const hex = RARITY_HEX[rarity || ""] ?? RARITY_HEX.common;
+  const styleDef = getStyleDef(displayStyle);
   return (
     <motion.div
-      className="flex items-center gap-1 px-2.5 py-1 rounded-[999px] shadow-md border border-[#D1CDC7]/50 bg-white cursor-default"
+      className="flex items-center gap-1 px-2.5 py-1 rounded-[999px] shadow-md cursor-default"
+      style={styleDef.container(hex)}
       title={name}
       whileHover={{ scale: 1.06 }}
       transition={{ type: "spring", stiffness: 400, damping: 20 }}
     >
       {type === "object" && <span className="text-sm leading-none">{emoji}</span>}
-      <span className={`text-[10px] font-bold uppercase tracking-[0.03em] ${color}`}>{name}</span>
+      <span className={styleDef.textClass} style={styleDef.textStyle(hex)}>
+        {name}
+      </span>
+      <StarBadge level={starLevel} />
     </motion.div>
   );
 }
@@ -292,6 +323,8 @@ function PodiumCard({
               name={player.equipped_title_name!}
               rarity={player.equipped_title_rarity}
               type="title"
+              displayStyle={player.equipped_title_display_style}
+              starLevel={player.equipped_title_star_level ?? 0}
             />
           ) : (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[999px] bg-white text-[#141413] text-[11px] font-bold tracking-[0.08em] uppercase shadow-sm">
@@ -380,8 +413,10 @@ function PodiumCard({
                 <SatelliteBadge
                   emoji={player.equipped_object_emoji!}
                   name={player.equipped_object_name!}
-                  rarity={null}
+                  rarity={player.equipped_object_rarity}
                   type="object"
+                  displayStyle={player.equipped_object_display_style}
+                  starLevel={player.equipped_object_star_level ?? 0}
                 />
               </motion.div>
             </div>
@@ -413,7 +448,7 @@ function PodiumCard({
             </div>
           )}
           <p className="text-3xl font-medium tracking-[-0.03em] text-[#9A3A0A] tabular-nums">
-            {player.nb_point.toLocaleString()}
+            {formatCompactPoints(player.nb_point)}
             <span className="text-sm text-[#696969] tracking-[0.08em] uppercase ml-2 align-middle">pts</span>
           </p>
         </div>
