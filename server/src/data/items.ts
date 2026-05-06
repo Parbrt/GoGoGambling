@@ -27,7 +27,7 @@ export const RARITY_MAP: Record<Rarity, RarityInfo> = {
 };
 
 // ─── Category definition ───
-export type ItemCategory = "people" | "fruit" | "title" | "burger" | "stock" | "points" | "loto_ticket";
+export type ItemCategory = "people" | "fruit" | "title" | "burger" | "stock" | "points" | "loto_ticket" | "consumable";
 
 // ─── Loot box types ───
 export type BoxType = "GAMBLINGBOX" | "GOGOBOX" | "XBOX";
@@ -212,8 +212,9 @@ export const ITEMS_CATALOG: CatalogItem[] = [
   { name: "GOGO Coin",     category: "stock", rarity: "rare", base_value: 25000, qualifyable: false, emoji: "🪙", description: "Une action GOGO. Prend de la valeur avec le temps." },
   { name: "GAMBLING Coin", category: "stock", rarity: "rare", base_value: 25000, qualifyable: false, emoji: "🎰", description: "Une action GAMBLING. Investissement volatile." },
 
-  // ▸▸▸ LOTO TICKET (Common)
-  { name: "Ticket de Loto", category: "loto_ticket", rarity: "common", base_value: 500, qualifyable: false, emoji: "🎟️", description: "Participe à la loterie hebdomadaire." },
+  // ▸▸▸ CONSUMABLES (Common)
+  { name: "Ticket de Loto", category: "consumable", rarity: "common", base_value: 500, qualifyable: false, emoji: "🎟️", description: "Participe à la loterie hebdomadaire." },
+  { name: "Recharge de Poulets", category: "consumable", rarity: "common", base_value: 300, qualifyable: false, emoji: "🔋", description: "Restaure toutes vos charges de combat de poulets." },
 ];
 
 // ─── Helper: get items by category ───

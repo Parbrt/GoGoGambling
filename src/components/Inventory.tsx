@@ -54,7 +54,7 @@ const CATEGORY_FILTERS = [
   { key: "fruit", label: "Fruits", icon: null },
   { key: "title", label: "Titres", icon: null },
   { key: "burger", label: "Burgers", icon: null },
-  { key: "loto_ticket", label: "Tickets", icon: null },
+  { key: "consumable", label: "Consommables", icon: null },
 ];
 
 // ─── Component ───
@@ -67,6 +67,8 @@ export function Inventory() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [fusingId, setFusingId] = useState<number | null>(null);
   const [fuseResult, setFuseResult] = useState<{ name: string; stars: number } | null>(null);
+  const [usingId, setUsingId] = useState<number | null>(null);
+  const [useEffectMsg, setUseEffectMsg] = useState<string | null>(null);
 
   // ─── Load inventory ───
 
@@ -125,11 +127,28 @@ export function Inventory() {
     }
   }
 
+  // ─── Use consumable ───
+
+  async function handleUse(inventoryId: number) {
+    setUsingId(inventoryId);
+    try {
+      const result = await api.shop.useConsumable(inventoryId);
+      setUseEffectMsg(result.effect);
+      await loadInventory();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'utilisation");
+    } finally {
+      setUsingId(null);
+    }
+  }
+
   // ─── Filter items ───
 
   const filteredItems = activeFilter === "all"
     ? items
-    : items.filter((i) => i.category === activeFilter);
+    : activeFilter === "consumable"
+      ? items.filter((i) => i.category === "consumable" || i.category === "loto_ticket")
+      : items.filter((i) => i.category === activeFilter);
 
   // ─── Group items for compact display ───
 
@@ -150,7 +169,11 @@ export function Inventory() {
 
   const categoryCounts = CATEGORY_FILTERS.map((cat) => ({
     ...cat,
-    count: cat.key === "all" ? items.length : items.filter((i) => i.category === cat.key).length,
+    count: cat.key === "all"
+      ? items.length
+      : cat.key === "consumable"
+        ? items.filter((i) => i.category === "consumable" || i.category === "loto_ticket").length
+        : items.filter((i) => i.category === cat.key).length,
   }));
 
   if (loading) {
@@ -275,6 +298,7 @@ export function Inventory() {
               const canEquipTitle = item.category === "title";
               const canEquipObject = ["people", "fruit", "burger"].includes(item.category);
               const canFuse = item.qualifyable && item.quantity >= 5 && item.star_level < 3;
+              const isConsumable = item.category === "consumable" || item.category === "loto_ticket";
 
               return (
                 <div
@@ -364,6 +388,19 @@ export function Inventory() {
                         )}
                       </button>
                     )}
+                    {isConsumable && (
+                      <button
+                        onClick={() => handleUse(item.inventoryIds[0])}
+                        disabled={usingId === item.inventoryIds[0]}
+                        className="text-[10px] font-medium px-2 py-1 rounded-full bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                      >
+                        {usingId === item.inventoryIds[0] ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          "Utiliser"
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -439,6 +476,14 @@ export function Inventory() {
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#CF4500] text-white px-6 py-3 rounded-full text-sm font-medium shadow-lg flex items-center gap-3">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="hover:opacity-80">×</button>
+        </div>
+      )}
+
+      {/* Effect toast */}
+      {useEffectMsg && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-full text-sm font-medium shadow-lg flex items-center gap-3">
+          <span>{useEffectMsg}</span>
+          <button onClick={() => setUseEffectMsg(null)} className="hover:opacity-80">×</button>
         </div>
       )}
     </div>

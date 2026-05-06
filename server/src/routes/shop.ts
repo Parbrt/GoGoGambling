@@ -89,7 +89,7 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       } else if (catalogItem.name === "GAMBLING Coin") {
         db.prepare("UPDATE players SET nb_share_B = nb_share_B + 1 WHERE user_id = ?").run(req.userId!);
       }
-    } else if (catalogItem.category === "loto_ticket") {
+    } else if (catalogItem.name === "Ticket de Loto") {
       // Loto ticket — add to inventory AND increment playable ticket counter
       const existing = db
         .prepare(
@@ -760,7 +760,7 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       } else if (catalogItem.name === "GAMBLING Coin") {
         db.prepare("UPDATE players SET nb_share_B = nb_share_B + 1 WHERE user_id = ?").run(userId);
       }
-    } else if (catalogItem.category === "loto_ticket") {
+    } else if (catalogItem.name === "Ticket de Loto") {
       const existing = db
         .prepare("SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0")
         .get(userId, catalogItem.id) as { id: number; quantity: number } | undefined;
@@ -804,6 +804,85 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
     });
   } catch (err) {
     console.error("[shop] Erreur daily-free-box:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
+// ─── Use consumable item ────────────────────────────────────────
+
+router.post("/use-consumable", authMiddleware, (req: AuthenticatedRequest, res) => {
+  try {
+    const { inventoryId } = req.body as { inventoryId: number };
+
+    if (!inventoryId) {
+      res.status(400).json({ error: "ID d'objet requis" });
+      return;
+    }
+
+    const db = getDb();
+    const userId = req.userId!;
+
+    const source = db
+      .prepare(
+        `SELECT pi.*, ic.name, ic.category, ic.emoji
+         FROM player_inventory pi
+         JOIN items_catalog ic ON pi.item_id = ic.id
+         WHERE pi.id = ? AND pi.user_id = ?`
+      )
+      .get(inventoryId, userId) as
+      | { id: number; item_id: number; quantity: number; name: string; category: string; emoji: string }
+      | undefined;
+
+    if (!source) {
+      res.status(404).json({ error: "Objet introuvable dans votre inventaire" });
+      return;
+    }
+
+    if (source.category !== "consumable" && source.category !== "loto_ticket") {
+      res.status(400).json({ error: "Cet objet n'est pas un consommable" });
+      return;
+    }
+
+    // Apply effect based on item name
+    let effectMessage = "";
+    const player = db
+      .prepare("SELECT * FROM players WHERE user_id = ?")
+      .get(userId) as Player | undefined;
+
+    if (!player) {
+      res.status(404).json({ error: "Joueur introuvable" });
+      return;
+    }
+
+    if (source.name === "Recharge de Poulets") {
+      db.prepare(
+        "UPDATE players SET chicken_charges = 5, last_chicken_charge_refill = ? WHERE user_id = ?"
+      ).run(new Date().toISOString(), userId);
+      effectMessage = "Toutes vos charges de poulet ont été restaurées !";
+    } else {
+      res.status(400).json({ error: "Ce consommable ne peut pas être utilisé ici" });
+      return;
+    }
+
+    // Consume one from inventory
+    if (source.quantity <= 1) {
+      db.prepare("DELETE FROM player_inventory WHERE id = ?").run(inventoryId);
+    } else {
+      db.prepare("UPDATE player_inventory SET quantity = quantity - 1 WHERE id = ?").run(inventoryId);
+    }
+
+    const updatedPlayer = db
+      .prepare("SELECT * FROM players WHERE user_id = ?")
+      .get(userId) as Player;
+
+    res.json({
+      success: true,
+      effect: effectMessage,
+      player: updatedPlayer,
+      item_name: source.name,
+    });
+  } catch (err) {
+    console.error("[shop] Erreur use-consumable:", err);
     res.status(500).json({ error: "Erreur serveur" });
   }
 });

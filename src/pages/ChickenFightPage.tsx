@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { ChickenFight } from "@/components/ChickenFight";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@/lib/api";
 import type { PlayerType } from "@/types";
 
 interface ChickenFightPageProps {
@@ -9,6 +11,38 @@ interface ChickenFightPageProps {
 }
 
 export function ChickenFightPage({ userId, player, onPlayerUpdate }: ChickenFightPageProps) {
+  const [chickenRecharges, setChickenRecharges] = useState<Array<{ id: number; quantity: number }>>([]);
+
+  useEffect(() => {
+    async function loadRecharges() {
+      try {
+        const inv = await api.shop.inventory();
+        const recharges = (inv as Array<{ id: number; item_id: number; quantity: number; name: string; category: string }>)
+          .filter((i) => i.name === "Recharge de Poulets")
+          .map((i) => ({ id: i.id, quantity: i.quantity }));
+        setChickenRecharges(recharges);
+      } catch {
+        // Silently fail — recharges simply won't show
+      }
+    }
+    loadRecharges();
+  }, []);
+
+  async function handleUseRecharge(inventoryId: number) {
+    try {
+      const result = await api.shop.useConsumable(inventoryId);
+      onPlayerUpdate(result.player);
+      // Refresh recharge list
+      const inv = await api.shop.inventory();
+      const recharges = (inv as Array<{ id: number; quantity: number; name: string }>)
+        .filter((i) => i.name === "Recharge de Poulets")
+        .map((i) => ({ id: i.id, quantity: i.quantity }));
+      setChickenRecharges(recharges);
+    } catch {
+      // Handled by ChickenFight
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <div className="space-y-2">
@@ -23,6 +57,8 @@ export function ChickenFightPage({ userId, player, onPlayerUpdate }: ChickenFigh
         currentPoints={player.nb_point}
         initialCharges={player.chicken_charges ?? 5}
         initialLastChargeRefill={player.last_chicken_charge_refill ?? null}
+        chickenRecharges={chickenRecharges}
+        onUseRecharge={handleUseRecharge}
         onPlayerUpdate={(updated) => onPlayerUpdate({ ...player, ...updated })}
       />
 

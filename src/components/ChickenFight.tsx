@@ -13,6 +13,8 @@ interface ChickenFightProps {
   currentPoints: number;
   initialCharges?: number;
   initialLastChargeRefill?: string | null;
+  chickenRecharges?: Array<{ id: number; quantity: number }>;
+  onUseRecharge?: (inventoryId: number) => Promise<void>;
   onPlayerUpdate: (player: { nb_point: number; chicken_charges: number; last_chicken_charge_refill: string | null }) => void;
 }
 
@@ -25,11 +27,11 @@ function calcNextChargeMs(charges: number, lastRefill: string | null): number {
   if (charges >= MAX_CHARGES || !lastRefill) return 0;
   const now = Date.now();
   const elapsed = now - new Date(lastRefill).getTime();
-  const remaining = CHARGE_COOLDOWN_MS - (elapsed % CHARGE_COOLDOWN_MS);
-  return Math.max(0, remaining);
+  if (elapsed >= CHARGE_COOLDOWN_MS) return 0;
+  return CHARGE_COOLDOWN_MS - elapsed;
 }
 
-export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, onPlayerUpdate }: ChickenFightProps) {
+export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, chickenRecharges = [], onUseRecharge, onPlayerUpdate }: ChickenFightProps) {
   const [chickenA, setChickenA] = useState<number[]>(createChicken);
   const [chickenB, setChickenB] = useState<number[]>(createChicken);
   const [betAmount, setBetAmount] = useState<number>(0);
@@ -39,6 +41,8 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
   const [isWin, setIsWin] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [population, setPopulation] = useState<[number, number][]>(generatePopulation);
+  const [usingRecharge, setUsingRecharge] = useState(false);
+  const [rechargeMsg, setRechargeMsg] = useState<string | null>(null);
 
   // Charges state
   const [charges, setCharges] = useState(initialCharges);
@@ -122,6 +126,27 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
     setBetAmount(amount);
   };
 
+  const handleUseRecharge = async () => {
+    const recharge = chickenRecharges.find((r) => r.quantity > 0);
+    if (!recharge || !onUseRecharge) return;
+
+    setUsingRecharge(true);
+    try {
+      await onUseRecharge(recharge.id);
+      setCharges(MAX_CHARGES);
+      setNextChargeMs(0);
+      setRechargeMsg("Charges restaurées !");
+      setTimeout(() => setRechargeMsg(null), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erreur lors de la recharge");
+    } finally {
+      setUsingRecharge(false);
+    }
+  };
+
+  const hasCharges = charges > 0;
+  const hasRecharges = chickenRecharges.some((r) => r.quantity > 0);
+
   const handleStartFight = async () => {
     if (!selectedChicken || betAmount <= 0 || betAmount > currentPoints) return setError("Choisissez un poulet et une mise valide");
     if (charges <= 0) return setError("Plus de charges disponibles, attendez la prochaine recharge");
@@ -200,10 +225,29 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
             ))}
           </div>
           <span className="text-sm font-bold text-primary">{charges}/{MAX_CHARGES}</span>
-          {charges < MAX_CHARGES && (
+          {charges < MAX_CHARGES && nextChargeMs > 0 && (
             <span className="text-xs text-muted-foreground tabular-nums">
               +1 dans {Math.floor(nextChargeMs / 60000)}:{(Math.floor((nextChargeMs % 60000) / 1000)).toString().padStart(2, "0")}
             </span>
+          )}
+          {!hasCharges && hasRecharges && onUseRecharge && (
+            <button
+              onClick={handleUseRecharge}
+              disabled={usingRecharge}
+              className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1 rounded-full bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+            >
+              {usingRecharge ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Recharge...
+                </>
+              ) : (
+                <>🔋 Recharger</>
+              )}
+            </button>
+          )}
+          {rechargeMsg && (
+            <span className="text-xs font-medium text-green-600">{rechargeMsg}</span>
           )}
         </div>
 

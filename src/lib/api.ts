@@ -371,6 +371,13 @@ export const api = {
         player: PlayerType;
         free: boolean;
       }>("/api/shop/daily-free-box"),
+    useConsumable: (inventoryId: number) =>
+      post<{
+        success: boolean;
+        effect: string;
+        player: PlayerType;
+        item_name: string;
+      }>("/api/shop/use-consumable", { inventoryId }),
     marketplace: {
       list: (inventoryId: number, quantity: number, price: number) =>
         post<{ success: boolean; listingId: number }>("/api/shop/marketplace/list", {

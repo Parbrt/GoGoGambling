@@ -231,30 +231,34 @@ function createShopTables(db: ReturnType<typeof getDb>): void {
 }
 
 function seedItemsCatalog(db: ReturnType<typeof getDb>): void {
-  const count = db.prepare("SELECT COUNT(*) as cnt FROM items_catalog").get() as { cnt: number };
+  // Ensure unique constraint to allow safe upsert
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_items_catalog_name_cat ON items_catalog(name, category)`);
 
-  if (count.cnt === 0) {
-    const insert = db.prepare(
-      "INSERT INTO items_catalog (name, category, rarity, base_value, qualifyable, emoji, description) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    );
+  // Migrate: update category for renamed items
+  db.prepare(
+    "UPDATE OR IGNORE items_catalog SET category = ? WHERE name = ? AND category = ?"
+  ).run("consumable", "Ticket de Loto", "loto_ticket");
 
-    const transaction = db.transaction(() => {
-      for (const item of ITEMS_CATALOG) {
-        insert.run(
-          item.name,
-          item.category,
-          item.rarity,
-          item.base_value,
-          item.qualifyable ? 1 : 0,
-          item.emoji,
-          item.description
-        );
-      }
-    });
+  const upsert = db.prepare(
+    `INSERT OR IGNORE INTO items_catalog (name, category, rarity, base_value, qualifyable, emoji, description)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
 
-    transaction();
-    console.log(`[schema] Seeded ${ITEMS_CATALOG.length} items into catalog`);
-  }
+  const transaction = db.transaction(() => {
+    for (const item of ITEMS_CATALOG) {
+      upsert.run(
+        item.name,
+        item.category,
+        item.rarity,
+        item.base_value,
+        item.qualifyable ? 1 : 0,
+        item.emoji,
+        item.description
+      );
+    }
+  });
+
+  transaction();
 }
 
 function migrateAvgShareColumns(db: ReturnType<typeof getDb>): void {

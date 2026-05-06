@@ -239,8 +239,8 @@ function getChickenNextChargeMs(charges: number, lastRefill: string | null): num
   const now = Date.now();
   const lastRefillMs = new Date(lastRefill).getTime();
   const elapsed = now - lastRefillMs;
-  const remaining = CHICKEN_CHARGE_COOLDOWN_MS - (elapsed % CHICKEN_CHARGE_COOLDOWN_MS);
-  return Math.max(0, remaining);
+  if (elapsed >= CHICKEN_CHARGE_COOLDOWN_MS) return 0;
+  return CHICKEN_CHARGE_COOLDOWN_MS - elapsed;
 }
 
 function randint(min: number, max: number): number {
