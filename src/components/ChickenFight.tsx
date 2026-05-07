@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
-import { CHICKEN_STATS, createChicken, generatePopulation, calculateBets } from "@/lib/chickenGame";
+import { CHICKEN_STATS, calculateBets } from "@/lib/chickenGame";
 import { api } from "@/lib/api";
 import { formatCompactPoints } from "@/lib/utils";
 
@@ -33,15 +33,16 @@ function calcNextChargeMs(charges: number, lastRefill: string | null): number {
 }
 
 export function ChickenFight({ currentPoints, initialCharges = 5, initialLastChargeRefill = null, chickenRecharges = [], onUseRecharge, onPlayerUpdate }: ChickenFightProps) {
-  const [chickenA, setChickenA] = useState<number[]>(createChicken);
-  const [chickenB, setChickenB] = useState<number[]>(createChicken);
+  const [chickenA, setChickenA] = useState<number[] | null>(null);
+  const [chickenB, setChickenB] = useState<number[] | null>(null);
+  const [matchLoading, setMatchLoading] = useState(true);
   const [betAmount, setBetAmount] = useState<number>(0);
   const [selectedChicken, setSelectedChicken] = useState<1 | 2 | null>(null);
   const [phase, setPhase] = useState<GamePhase>("betting");
   const [resultMessage, setResultMessage] = useState<string>("");
   const [isWin, setIsWin] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [population, setPopulation] = useState<[number, number][]>(generatePopulation);
+  const [population, setPopulation] = useState<[number, number][]>([]);
   const [usingRecharge, setUsingRecharge] = useState(false);
   const [rechargeMsg, setRechargeMsg] = useState<string | null>(null);
 
@@ -50,6 +51,14 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
   const [lastChargeRefill, setLastChargeRefill] = useState<string | null>(initialLastChargeRefill);
   const [nextChargeMs, setNextChargeMs] = useState(() => calcNextChargeMs(initialCharges, initialLastChargeRefill));
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load server-generated chickens + population on mount — prevents re-rolling via page refresh
+  useEffect(() => {
+    api.games.chickenMatch()
+      .then(({ chickenA: a, chickenB: b, population: pop }) => { setChickenA(a); setChickenB(b); setPopulation(pop); })
+      .catch(() => setError("Impossible de charger le match"))
+      .finally(() => setMatchLoading(false));
+  }, []);
 
   const betInfo = useMemo(
     () => calculateBets(population, betAmount, selectedChicken),
@@ -156,9 +165,10 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
     setError(null);
 
     try {
-      const result = await api.games.chickenFight(betAmount, selectedChicken, chickenA, chickenB);
-      setChickenA(result.chickenA);
-      setChickenB(result.chickenB);
+      const result = await api.games.chickenFight(betAmount, selectedChicken);
+      setChickenA(result.nextChickenA);
+      setChickenB(result.nextChickenB);
+      setPopulation(result.nextPopulation);
       setFightResult(result.fightResult);
       setIsWin(result.isWin);
 
@@ -184,9 +194,8 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
   };
 
   const handleNextRound = useCallback(() => {
-    setChickenA(createChicken()); setChickenB(createChicken());
+    // Chickens and population for next round were already set from the fight response
     setSelectedChicken(null); setBetAmount(0);
-    setPopulation(generatePopulation());
     setPhase("betting"); setFightResult(null);
     setResultMessage(""); setError(null); setIsWin(false);
   }, []);
@@ -197,10 +206,6 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
     return <Badge variant="destructive">LOW</Badge>;
   };
 
-  // Chickens for pre-fight display
-  const displayA = chickenA;
-  const displayB = chickenB;
-
   return (
     <Card>
       <CardHeader className="text-center">
@@ -208,6 +213,14 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
       </CardHeader>
       <CardContent className="space-y-6">
         {error && <div className="p-4 bg-destructive/10 text-destructive rounded-lg">{error}</div>}
+
+        {matchLoading && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+
+        {!matchLoading && chickenA && chickenB && (<>
 
         <div className="text-center">
           <p className="text-lg">Vos points: <span className="font-bold text-primary text-xl">{formatCompactPoints(currentPoints)}</span></p>
@@ -261,7 +274,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
                   {CHICKEN_STATS.map((stat, idx) => (
                     <div key={stat} className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{stat}</span>
-                      {getStatBadge(displayA[idx])}
+                      {getStatBadge(chickenA[idx])}
                     </div>
                   ))}
                   <Separator />
@@ -281,7 +294,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
                   {CHICKEN_STATS.map((stat, idx) => (
                     <div key={stat} className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{stat}</span>
-                      {getStatBadge(displayB[idx])}
+                      {getStatBadge(chickenB[idx])}
                     </div>
                   ))}
                   <Separator />
@@ -363,6 +376,7 @@ export function ChickenFight({ currentPoints, initialCharges = 5, initialLastCha
             <Button onClick={handleNextRound} size="lg">Prochain combat</Button>
           </div>
         )}
+        </>)}
       </CardContent>
     </Card>
   );

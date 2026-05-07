@@ -31,6 +31,7 @@ export interface BabyFightBet {
   playerName: string;
   amount: number;
   betOn: number;
+  isBot?: boolean;
 }
 
 export interface BabyFightState {

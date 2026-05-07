@@ -8,6 +8,7 @@ interface PlayerResult {
   won: boolean;
   winnings: number;
   betAmount: number;
+  isBot?: boolean;
 }
 
 interface FightResultData {
@@ -34,10 +35,14 @@ interface FightResultProps {
 export function FightResult({ result }: FightResultProps) {
   const winnerName = result.winner === 1 ? result.babyAName : result.babyBName;
 
-  const sortedResults = [...result.results].sort((a, b) => {
-    if (a.won !== b.won) return a.won ? -1 : 1;
-    return b.winnings - a.winnings;
-  });
+  const sortedResults = [...result.results]
+    .filter(r => !r.isBot)
+    .sort((a, b) => {
+      if (a.won !== b.won) return a.won ? -1 : 1;
+      return b.winnings - a.winnings;
+    });
+
+  const hasRealPlayerBets = sortedResults.length > 0;
 
   return (
     <div className="space-y-6">
@@ -97,7 +102,7 @@ export function FightResult({ result }: FightResultProps) {
         </CardContent>
       </Card>
 
-      {sortedResults.length > 0 && (
+      {hasRealPlayerBets && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">💰 Gains des joueurs</CardTitle>

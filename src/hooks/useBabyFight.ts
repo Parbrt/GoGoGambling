@@ -209,8 +209,8 @@ export function useBabyFight(player: PlayerType, onPlayerUpdate: (p: PlayerType)
   });
 
   const handleBet = useCallback(async () => {
-    if (!fight || !selectedBaby || betAmount < 10 || betAmount > 10000 || betAmount > player.nb_point) {
-      setError("Selectionnez un bebe et une mise valide (10-10000 points)");
+    if (!fight || !selectedBaby || betAmount < 10 || betAmount > 20000 || betAmount > player.nb_point) {
+      setError("Selectionnez un bebe et une mise valide (10-20000 points)");
       return null;
     }
 

@@ -164,11 +164,16 @@ export const api = {
         winnings: number;
         isWin: boolean;
       }>("/api/games/roulette/spin", { bet, choiceType, choiceValue }),
-    chickenFight: (bet: number, selectedChicken: 1 | 2, chickenA?: number[], chickenB?: number[]) =>
+    chickenMatch: () =>
+      get<{ chickenA: number[]; chickenB: number[]; population: [number, number][] }>("/api/games/chicken/match"),
+    chickenFight: (bet: number, selectedChicken: 1 | 2) =>
       post<{
         player: PlayerType;
         chickenA: number[];
         chickenB: number[];
+        nextChickenA: number[];
+        nextChickenB: number[];
+        nextPopulation: [number, number][];
         fightResult: {
           winner: 1 | 2;
           stats: [number, number, number];
@@ -184,7 +189,7 @@ export const api = {
         population: [number, number][];
         chicken_charges: number;
         next_charge_in_ms: number;
-      }>("/api/games/chicken/fight", { bet, selectedChicken, chickenA, chickenB }),
+      }>("/api/games/chicken/fight", { bet, selectedChicken }),
     babyFight: {
       state: () =>
         get<{

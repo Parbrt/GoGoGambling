@@ -14,6 +14,18 @@ const BABY_NAMES = [
 
 const BABY_STATS = ["Bave", "Colere", "Odeur", "Gaz", "Chance"];
 
+const SEED_POT = 10000;
+const MAX_BET = 20000;
+const BOT_COUNT_MIN = 6;
+const BOT_COUNT_MAX = 15;
+
+const BOT_NAMES = [
+  "Bebe Ninja", "Bebe Samourai", "Bebe Pirate", "Bebe Magicien",
+  "Bebe Robot", "Bebe Zombie", "Bebe Vampire", "Bebe Loup-Garou",
+  "Bebe Astronaute", "Bebe Detector", "Bebe Champion", "Bebe Legende",
+  "Bebe Titan", "Bebe Dragon", "Bebe Phoenix",
+];
+
 interface BabyFightRow {
   id: number;
   baby_a_name: string;
@@ -55,6 +67,40 @@ function generateBabyName(): string {
 
 function generateBabyStats(): number[] {
   return Array.from({ length: BABY_STATS.length }, () => randint(0, 100));
+}
+
+function generateBotBets(): Array<{ playerName: string; amount: number; betOn: 1 | 2 }> {
+  const count = randint(BOT_COUNT_MIN, BOT_COUNT_MAX);
+  const usedNames = new Set<string>();
+  const bots: Array<{ playerName: string; amount: number; betOn: 1 | 2 }> = [];
+
+  const pickName = (): string => {
+    let name: string;
+    let attempts = 0;
+    do {
+      name = BOT_NAMES[randint(0, BOT_NAMES.length - 1)];
+      attempts++;
+    } while (usedNames.has(name) && attempts < 20);
+    usedNames.add(name);
+    return name;
+  };
+
+  bots.push({ playerName: pickName(), amount: randint(200, 2000), betOn: 1 });
+  bots.push({ playerName: pickName(), amount: randint(200, 2000), betOn: 2 });
+
+  for (let i = 2; i < count; i++) {
+    bots.push({
+      playerName: pickName(),
+      amount: randint(100, 5000),
+      betOn: (randint(1, 2) as 1 | 2),
+    });
+  }
+
+  return bots;
+}
+
+function isBotUserId(userId: string): boolean {
+  return userId.startsWith("bot_");
 }
 
 function runFight(babyA: number[], babyB: number[]) {
@@ -117,14 +163,29 @@ export function startNewFight(): BabyFightRow | null {
   let nameB = generateBabyName();
   while (nameB === nameA) nameB = generateBabyName();
 
+  const botBets = generateBotBets();
+  let botPotA = 0;
+  let botPotB = 0;
+  for (const bot of botBets) {
+    if (bot.betOn === 1) botPotA += bot.amount;
+    else botPotB += bot.amount;
+  }
+
+  const initialPotA = SEED_POT + botPotA;
+  const initialPotB = SEED_POT + botPotB;
+  const initialOdds = calculateOdds(initialPotA, initialPotB);
+
   db.prepare(
-    `INSERT INTO baby_fights (baby_a_name, baby_b_name, baby_a_stats, baby_b_stats, scheduled_at, status, created_at, total_pot_a, total_pot_b)
-     VALUES (?, ?, ?, ?, ?, 'betting', ?, 250, 250)`
+    `INSERT INTO baby_fights (baby_a_name, baby_b_name, baby_a_stats, baby_b_stats, scheduled_at, status, created_at, total_pot_a, total_pot_b, odds_a, odds_b, bet_count)
+     VALUES (?, ?, ?, ?, ?, 'betting', ?, ?, ?, ?, ?, ?)`
   ).run(
     nameA, nameB,
     JSON.stringify(babyAStats), JSON.stringify(babyBStats),
     nextHour.toISOString(),
-    now.toISOString()
+    now.toISOString(),
+    initialPotA, initialPotB,
+    initialOdds.oddsA, initialOdds.oddsB,
+    botBets.length
   );
 
   const fight = db.prepare(
@@ -133,9 +194,29 @@ export function startNewFight(): BabyFightRow | null {
 
   if (!fight) return null;
 
+  const insertBet = db.prepare(
+    `INSERT INTO baby_fight_bets (fight_id, user_id, player_name, bet_on, amount, odds_at_bet, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  );
+  const createdAt = now.toISOString();
+  let botIdx = 0;
+  for (const bot of botBets) {
+    insertBet.run(
+      fight.id, `bot_${botIdx}`, bot.playerName,
+      bot.betOn, bot.amount,
+      bot.betOn === 1 ? initialOdds.oddsA : initialOdds.oddsB,
+      createdAt
+    );
+    botIdx++;
+  }
+
+  const allBets = db.prepare(
+    "SELECT player_name, amount, bet_on FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
+  ).all(fight.id) as Array<{ player_name: string; amount: number; bet_on: number }>;
+
   broadcastBabyFight("baby_fight:new", {
     fight: formatFightForClient(fight),
-    bets: [],
+    bets: allBets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on })),
     timeRemaining: getTimeRemaining(fight.scheduled_at),
   });
 
@@ -228,19 +309,26 @@ export function resolveCurrentFight(): void {
     "SELECT * FROM baby_fight_bets WHERE fight_id = ?"
   ).all(fight.id) as BabyFightBetRow[];
 
-  const results: Array<{ playerName: string; won: boolean; winnings: number; betAmount: number }> = [];
+  const results: Array<{ playerName: string; won: boolean; winnings: number; betAmount: number; isBot: boolean }> = [];
 
   for (const bet of bets) {
+    const isBot = isBotUserId(bet.user_id);
     const won = bet.bet_on === result.winner;
     const winnings = won ? Math.round(bet.amount * bet.odds_at_bet) : 0;
 
-    db.prepare(
-      "UPDATE baby_fight_bets SET won = ?, winnings = ? WHERE id = ?"
-    ).run(won ? 1 : 0, winnings, bet.id);
+    if (isBot) {
+      db.prepare(
+        "UPDATE baby_fight_bets SET won = ?, winnings = ? WHERE id = ?"
+      ).run(won ? 1 : 0, winnings, bet.id);
+    } else {
+      db.prepare(
+        "UPDATE baby_fight_bets SET won = ?, winnings = ? WHERE id = ?"
+      ).run(won ? 1 : 0, winnings, bet.id);
 
-    if (won) {
-      db.prepare("UPDATE players SET nb_point = nb_point + ? WHERE user_id = ?")
-        .run(winnings, bet.user_id);
+      if (won) {
+        db.prepare("UPDATE players SET nb_point = nb_point + ? WHERE user_id = ?")
+          .run(winnings, bet.user_id);
+      }
     }
 
     results.push({
@@ -248,6 +336,7 @@ export function resolveCurrentFight(): void {
       won,
       winnings,
       betAmount: bet.amount,
+      isBot,
     });
   }
 
@@ -320,7 +409,7 @@ export function placeBet(
   const fight = db.prepare("SELECT * FROM baby_fights WHERE id = ?").get(fightId) as BabyFightRow | undefined;
   if (!fight) return { success: false, error: "Combat introuvable" };
   if (fight.status !== "betting") return { success: false, error: "Les paris sont fermes" };
-  if (amount < 10 || amount > 10000) return { success: false, error: "Mise entre 10 et 10000 points" };
+  if (amount < 10 || amount > MAX_BET) return { success: false, error: `Mise entre 10 et ${MAX_BET} points` };
   if (amount > currentPoints) return { success: false, error: "Fonds insuffisants" };
 
   const existingBet = db.prepare(
@@ -370,7 +459,7 @@ export function getFightHistory(limit = 5) {
 
   return fights.map(f => {
     const bets = db.prepare(
-      "SELECT * FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at ASC"
+      "SELECT * FROM baby_fight_bets WHERE fight_id = ? AND user_id NOT LIKE 'bot_%' ORDER BY created_at ASC"
     ).all(f.id) as BabyFightBetRow[];
 
     return {
@@ -393,7 +482,7 @@ export function getFightById(fightId: number) {
   if (!fight) return null;
 
   const bets = db.prepare(
-    "SELECT * FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at ASC"
+    "SELECT * FROM baby_fight_bets WHERE fight_id = ? AND user_id NOT LIKE 'bot_%' ORDER BY created_at ASC"
   ).all(fight.id) as BabyFightBetRow[];
 
   return {

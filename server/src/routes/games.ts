@@ -303,8 +303,47 @@ function calculateOdds(population: [number, number][], userBet: number, userChoi
   return { betA, betB, oddsA, oddsB };
 }
 
+function getOrCreateChickenMatch(player: Player): { chickenA: number[]; chickenB: number[]; population: [number, number][] } {
+  if (player.chicken_match) {
+    try {
+      const parsed = JSON.parse(player.chicken_match) as { a: number[]; b: number[]; pop: [number, number][] };
+      if (
+        Array.isArray(parsed.a) && parsed.a.length === 5 &&
+        Array.isArray(parsed.b) && parsed.b.length === 5 &&
+        Array.isArray(parsed.pop) && parsed.pop.length > 0
+      ) {
+        return { chickenA: parsed.a, chickenB: parsed.b, population: parsed.pop };
+      }
+    } catch {
+      // fall through to generate new
+    }
+  }
+  const chickenA = createChicken();
+  const chickenB = createChicken();
+  const population = generatePopulation();
+  const db = getDb();
+  db.prepare("UPDATE players SET chicken_match = ? WHERE user_id = ?")
+    .run(JSON.stringify({ a: chickenA, b: chickenB, pop: population }), player.user_id);
+  return { chickenA, chickenB, population };
+}
+
+router.get("/chicken/match", authMiddleware, (req: AuthenticatedRequest, res) => {
+  const db = getDb();
+  const player = db
+    .prepare("SELECT * FROM players WHERE user_id = ?")
+    .get(req.userId!) as Player | undefined;
+
+  if (!player) {
+    res.status(404).json({ error: "Joueur introuvable" });
+    return;
+  }
+
+  const { chickenA, chickenB, population } = getOrCreateChickenMatch(player);
+  res.json({ chickenA, chickenB, population });
+});
+
 router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) => {
-  const { bet, selectedChicken, chickenA: clientA, chickenB: clientB } = req.body as { bet: number; selectedChicken: 1 | 2; chickenA?: number[]; chickenB?: number[] };
+  const { bet, selectedChicken } = req.body as { bet: number; selectedChicken: 1 | 2 };
 
   if (!bet || bet <= 0 || !selectedChicken) {
     res.status(400).json({ error: "Paramètres invalides" });
@@ -336,9 +375,8 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
     return;
   }
 
-  const chickenA = clientA?.length === 5 ? clientA : createChicken();
-  const chickenB = clientB?.length === 5 ? clientB : createChicken();
-  const population = generatePopulation();
+  // Use server-stored chickens and population — never accept them from the client
+  const { chickenA, chickenB, population } = getOrCreateChickenMatch(player);
   const odds = calculateOdds(population, bet, selectedChicken);
   const result = fight(chickenA, chickenB);
 
@@ -347,12 +385,16 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
   const winnings = isWin ? Math.round(bet * selectedOdds) : 0;
   const newPoints = Math.round(player.nb_point - bet + winnings);
 
-  // Consume one charge
+  // Consume one charge and generate new chickens + population for the next round
   const newCharges = player.chicken_charges - 1;
   const nextChargeMs = getChickenNextChargeMs(newCharges, player.last_chicken_charge_refill);
+  const nextA = createChicken();
+  const nextB = createChicken();
+  const nextPop = generatePopulation();
+  const nextMatch = JSON.stringify({ a: nextA, b: nextB, pop: nextPop });
 
-  db.prepare("UPDATE players SET nb_point = ?, chicken_charges = ?, last_chicken_charge_refill = ? WHERE user_id = ?")
-    .run(newPoints, newCharges, player.last_chicken_charge_refill, req.userId!);
+  db.prepare("UPDATE players SET nb_point = ?, chicken_charges = ?, last_chicken_charge_refill = ?, chicken_match = ? WHERE user_id = ?")
+    .run(newPoints, newCharges, player.last_chicken_charge_refill, nextMatch, req.userId!);
 
   updatePeakNetWorth(req.userId!);
 
@@ -363,6 +405,9 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
   res.json({
     player: updated,
     chickenA, chickenB,
+    nextChickenA: nextA,
+    nextChickenB: nextB,
+    nextPopulation: nextPop,
     fightResult: result,
     odds,
     isWin,

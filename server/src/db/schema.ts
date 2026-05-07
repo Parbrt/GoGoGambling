@@ -79,6 +79,9 @@ export function initSchema(): void {
   // Migrate: add chicken charges columns
   migrateChickenChargesColumns(db);
 
+  // Migrate: add chicken_match column
+  migrateChickenMatchColumn(db);
+
   // Migrate: add display_style column to player_inventory
   migrateDisplayStyleColumn(db);
 
@@ -490,5 +493,13 @@ function migrateChickenChargesColumns(db: ReturnType<typeof getDb>): void {
   if (!info.find(c => c.name === "last_chicken_charge_refill")) {
     db.prepare("ALTER TABLE players ADD COLUMN last_chicken_charge_refill TEXT").run();
     console.log("[schema] Added last_chicken_charge_refill column");
+  }
+}
+
+function migrateChickenMatchColumn(db: ReturnType<typeof getDb>): void {
+  const info = db.pragma("table_info(players)") as Array<{ cid: number; name: string }>;
+  if (!info.find(c => c.name === "chicken_match")) {
+    db.prepare("ALTER TABLE players ADD COLUMN chicken_match TEXT").run();
+    console.log("[schema] Added chicken_match column");
   }
 }

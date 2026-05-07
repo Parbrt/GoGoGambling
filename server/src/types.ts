@@ -19,6 +19,7 @@ export interface Player {
   last_loto_ticket_claim: string | null;
   chicken_charges: number;
   last_chicken_charge_refill: string | null;
+  chicken_match: string | null;
 }
 
 export interface ShareSnapshot {
