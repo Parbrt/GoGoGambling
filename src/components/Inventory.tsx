@@ -69,6 +69,13 @@ export function Inventory() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [fusingId, setFusingId] = useState<number | null>(null);
   const [fuseResult, setFuseResult] = useState<{ name: string; stars: number } | null>(null);
+  const [fuseStylePicker, setFuseStylePicker] = useState<{
+    inventoryId: number;
+    itemName: string;
+    itemEmoji: string;
+    itemRarity: string;
+    styles: string[];
+  } | null>(null);
   const [usingId, setUsingId] = useState<number | null>(null);
   const [useEffectMsg, setUseEffectMsg] = useState<string | null>(null);
 
@@ -116,16 +123,31 @@ export function Inventory() {
 
   // ─── Fuse ───
 
-  async function handleFuse(inventoryId: number) {
+  async function handleFuse(inventoryId: number, displayStyle?: string) {
     setFusingId(inventoryId);
     try {
-      const result = await api.shop.fuse(inventoryId);
+      const result = await api.shop.fuse(inventoryId, displayStyle);
       setFuseResult({ name: result.item_name, stars: result.new_star_level });
       await loadInventory();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur lors de la fusion");
     } finally {
       setFusingId(null);
+    }
+  }
+
+  function onFuseClick(item: { inventoryIds: number[]; name: string; emoji: string; rarity: string; displayStyles: string[] }) {
+    const uniqueStyles = [...new Set(item.displayStyles)];
+    if (uniqueStyles.length > 1) {
+      setFuseStylePicker({
+        inventoryId: item.inventoryIds[0],
+        itemName: item.name,
+        itemEmoji: item.emoji,
+        itemRarity: item.rarity,
+        styles: uniqueStyles,
+      });
+    } else {
+      handleFuse(item.inventoryIds[0], uniqueStyles[0]);
     }
   }
 
@@ -163,8 +185,8 @@ export function Inventory() {
 
   // ─── Fusion helper ───
 
-  function getFuseReq(starLevel: number): number {
-    return starLevel === 0 ? 5 : 2;
+  function getFuseReq(_starLevel: number): number {
+    return 2;
   }
 
   const MAX_STAR = 5;
@@ -173,6 +195,7 @@ export function Inventory() {
     ...group[0],
     quantity: group.reduce((sum, i) => sum + i.quantity, 0),
     inventoryIds: group.map((i) => i.id),
+    displayStyles: [...new Set(group.map((i) => i.display_style || "default"))],
   }));
 
   // ─── Count by category ───
@@ -326,7 +349,7 @@ export function Inventory() {
               const canEquipTitle = item.category === "title";
               const canEquipObject = ["people", "fruit", "burger"].includes(item.category);
               const fuseReq = getFuseReq(item.star_level);
-              const canFuse = item.qualifyable && item.quantity >= fuseReq && item.star_level < MAX_STAR;
+              const canFuse = !!item.qualifyable && item.quantity >= fuseReq && item.star_level < MAX_STAR;
               const isConsumable = item.category === "consumable" || item.category === "loto_ticket";
 
               return (
@@ -420,7 +443,7 @@ export function Inventory() {
                     )}
                     {canFuse && (
                       <button
-                        onClick={() => handleFuse(item.inventoryIds[0])}
+                        onClick={() => onFuseClick(item)}
                         disabled={fusingId === item.inventoryIds[0]}
                         className="text-[10px] font-medium px-2 py-1 rounded-full bg-[#F37338]/10 text-[#CF4500] hover:bg-[#F37338]/20 transition-colors disabled:opacity-50"
                         title={`${fuseReq} → ${item.star_level + 1}★`}
@@ -513,6 +536,80 @@ export function Inventory() {
               >
                 <X className="w-4 h-4 text-[#696969]" />
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Style picker modal ─── */}
+      <AnimatePresence>
+        {fuseStylePicker && (
+          <motion.div
+            key="style-picker-overlay"
+            className="fixed inset-0 z-50 flex items-center justify-center p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-[#141413]/40 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setFuseStylePicker(null)}
+            />
+            <motion.div
+              className="relative w-full max-w-sm rounded-[40px] border border-[#D1CDC7] halo-soft p-8 flex flex-col gap-6 bg-[#FCFBFA]"
+              initial={{ scale: 0.85, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+            >
+              <button
+                onClick={() => setFuseStylePicker(null)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center bg-[#F3F0EE] hover:bg-[#E8E4E0]"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4 text-[#696969]" />
+              </button>
+
+              <div className="space-y-1 pr-8">
+                <h3 className="text-base font-medium tracking-[-0.02em] text-[#141413]">
+                  Choisir le style
+                </h3>
+                <p className="text-sm text-[#696969]">
+                  {fuseStylePicker.itemEmoji} <span className="font-medium text-[#141413]">{fuseStylePicker.itemName}</span> existe en plusieurs variantes. Laquelle garder ?
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {fuseStylePicker.styles.map((style) => {
+                  const hex = RARITY_HEX[fuseStylePicker.itemRarity] ?? RARITY_HEX.common;
+                  const sd = getStyleDef(style);
+                  return (
+                    <button
+                      key={style}
+                      onClick={() => {
+                        setFuseStylePicker(null);
+                        handleFuse(fuseStylePicker.inventoryId, style);
+                      }}
+                      className="flex flex-col items-center gap-2 p-4 rounded-[16px] border-2 border-[#E8E4E0] hover:border-[#141413] transition-colors bg-white hover:bg-[#F3F0EE]"
+                    >
+                      <span
+                        className="inline-flex items-center px-2.5 py-1 rounded-[999px] max-w-full truncate"
+                        style={sd.container(hex)}
+                      >
+                        <span className={sd.textClass} style={{ ...sd.textStyle(hex), fontSize: "11px" }}>
+                          {fuseStylePicker.itemName}
+                        </span>
+                      </span>
+                      <span className="text-[10px] text-[#696969] capitalize">
+                        {style === "default" ? "Normal" : style.replace(/_/g, " ")}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </motion.div>
           </motion.div>
         )}

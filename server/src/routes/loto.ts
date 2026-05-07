@@ -318,13 +318,11 @@ router.get("/status", authMiddleware, (req: AuthenticatedRequest, res) => {
     )
     .all(req.userId!, activeDrawDate) as LotoTicket[];
 
-  // Check daily free ticket
-  const freeTicketReset = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
-  const player = db
-    .prepare("SELECT last_loto_ticket_claim FROM players WHERE user_id = ?")
-    .get(req.userId!) as { last_loto_ticket_claim: string | null } | undefined;
-  const lastClaim = player?.last_loto_ticket_claim ? new Date(player.last_loto_ticket_claim) : null;
-  const canClaim = !lastClaim || lastClaim < freeTicketReset;
+  // Check daily free ticket — verify directly in tickets table to avoid timezone edge cases
+  const existingFreeTicket = db
+    .prepare("SELECT id FROM loto_tickets_v2 WHERE user_id = ? AND draw_date = ? AND is_free = 1")
+    .get(req.userId!, activeDrawDate) as { id: number } | undefined;
+  const canClaim = !existingFreeTicket;
 
   // Can buy if before draw time (noon) and under max
   const canBuy = now < drawTime && playerTickets.length < MAX_TICKETS_PER_PLAYER;
@@ -439,18 +437,19 @@ router.post("/claim-ticket", authMiddleware, (req: AuthenticatedRequest, res) =>
     return;
   }
 
-  const freeTicketReset = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
-  const lastClaim = player.last_loto_ticket_claim ? new Date(player.last_loto_ticket_claim) : null;
-
-  if (lastClaim && lastClaim >= freeTicketReset) {
-    res.status(400).json({ error: "Ticket deja reclame aujourd'hui" });
-    return;
-  }
-
   // Determine draw date: if before noon, today; if after noon, tomorrow
   const activeDrawDate = now < drawTime
     ? getDrawDate(now)
     : getDrawDate(new Date(now.getTime() + 86400000));
+
+  // Check if already claimed for this draw (robust check regardless of time-of-day edge cases)
+  const existingFreeTicket = db
+    .prepare("SELECT id FROM loto_tickets_v2 WHERE user_id = ? AND draw_date = ? AND is_free = 1")
+    .get(req.userId!, activeDrawDate) as { id: number } | undefined;
+  if (existingFreeTicket) {
+    res.status(400).json({ error: "Ticket gratuit deja reclame pour ce tirage" });
+    return;
+  }
 
   // Check ticket count for this draw
   const ticketCount = (db

@@ -104,6 +104,9 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       return;
     }
 
+    // Declare displayStyle with default for special categories
+    let displayStyle = "default";
+
     // Handle special categories that don't go to inventory
     if (catalogItem.category === "stock") {
       // GOGO Coin or GAMBLING Coin — increment player share count
@@ -132,7 +135,7 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       db.prepare("UPDATE players SET loto_tickets = loto_tickets + 1 WHERE user_id = ?").run(req.userId!);
     } else {
       // Normal inventory item — add to player_inventory
-      const displayStyle = rollDisplayStyle(catalogItem.rarity);
+      displayStyle = rollDisplayStyle(catalogItem.rarity);
       const existing = db
         .prepare(
           "SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0"
@@ -163,6 +166,7 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
       rolledRarity,
       rarityColor: rarityInfo?.color ?? "#999999",
       player: updatedPlayer,
+      displayStyle,
     });
   } catch (err) {
     console.error("[shop] Erreur open-box:", err);
@@ -370,67 +374,93 @@ router.get("/equipped/:userId", authMiddleware, handleGetEquipped);
 
 router.post("/fuse", authMiddleware, (req: AuthenticatedRequest, res) => {
   try {
-    const { inventoryId } = req.body as { inventoryId: number };
+    const { inventoryId, displayStyle } = req.body as { inventoryId: number; displayStyle?: string };
 
     const db = getDb();
     const userId = req.userId!;
 
-    const source = db
+    // Identify item from the referenced row
+    const ref = db
       .prepare(
-        `SELECT pi.*, ic.name, ic.qualifyable, ic.base_value
+        `SELECT pi.item_id, pi.star_level, ic.name, ic.qualifyable, ic.base_value
          FROM player_inventory pi
          JOIN items_catalog ic ON pi.item_id = ic.id
          WHERE pi.id = ? AND pi.user_id = ?`
       )
       .get(inventoryId, userId) as
-      | (PlayerInventoryJoined & { qualifyable: number; base_value: number })
+      | { item_id: number; star_level: number; name: string; qualifyable: number; base_value: number }
       | undefined;
 
-    if (!source) {
+    if (!ref) {
       res.status(404).json({ error: "Objet introuvable dans votre inventaire" });
       return;
     }
 
-    if (!source.qualifyable) {
+    if (!ref.qualifyable) {
       res.status(400).json({ error: "Cet objet ne peut pas être fusionné" });
       return;
     }
 
     const MAX_STAR = 5;
-    if (source.star_level >= MAX_STAR) {
-      res.status(400).json({ error: `Niveau ${"★".repeat(source.star_level)} maximum atteint` });
+    if (ref.star_level >= MAX_STAR) {
+      res.status(400).json({ error: `Niveau ${"★".repeat(ref.star_level)} maximum atteint` });
       return;
     }
 
-    // 5 copies for 0★→1★, 2 copies for each subsequent level
-    const required = source.star_level === 0 ? 5 : 2;
-    if (source.quantity < required) {
+    // Aggregate ALL rows for this item/star_level (multiple rows can exist after repeated fusions)
+    const allRows = db
+      .prepare(
+        "SELECT id, quantity, display_style FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = ? AND quantity > 0 ORDER BY id"
+      )
+      .all(userId, ref.item_id, ref.star_level) as { id: number; quantity: number; display_style: string }[];
+
+    const totalQty = allRows.reduce((sum, r) => sum + r.quantity, 0);
+    const required = 2;
+
+    if (totalQty < required) {
       res.status(400).json({
-        error: `Il vous faut ${required} exemplaire${required > 1 ? "s" : ""} pour fusionner. Vous en avez ${source.quantity}.`,
+        error: `Il vous faut ${required} exemplaires pour fusionner. Vous en avez ${totalQty}.`,
       });
       return;
     }
 
-    const newQuantity = source.quantity - required;
-    const newStarLevel = source.star_level + 1;
-
-    if (newQuantity <= 0) {
-      // Remove the old entry entirely
-      db.prepare("DELETE FROM player_inventory WHERE id = ?").run(inventoryId);
-    } else {
-      db.prepare("UPDATE player_inventory SET quantity = ? WHERE id = ?").run(
-        newQuantity,
-        inventoryId
-      );
+    // Consume 2 copies across rows (starting from oldest), track display styles of consumed rows
+    let toConsume = required;
+    const consumedStyles: string[] = [];
+    for (const row of allRows) {
+      if (toConsume <= 0) break;
+      const consume = Math.min(row.quantity, toConsume);
+      const remaining = row.quantity - consume;
+      if (row.display_style) consumedStyles.push(row.display_style);
+      if (remaining <= 0) {
+        db.prepare("DELETE FROM player_inventory WHERE id = ?").run(row.id);
+      } else {
+        db.prepare("UPDATE player_inventory SET quantity = ? WHERE id = ?").run(remaining, row.id);
+      }
+      toConsume -= consume;
     }
 
-    // Add the starred version
-    const insertResult = db.prepare(
-      "INSERT INTO player_inventory (user_id, item_id, quantity, star_level) VALUES (?, ?, 1, ?)"
-    ).run(userId, source.item_id, newStarLevel);
-    const newInventoryId = Number(insertResult.lastInsertRowid);
+    const newStarLevel = ref.star_level + 1;
+    // Use explicitly chosen style, or fall back to the style of the first consumed row
+    const resolvedStyle = displayStyle ?? consumedStyles[0] ?? "default";
 
-    // If the old row was equipped, update player_equipped to point to the new fused row
+    // Merge into existing row for this star level if one exists (avoids fragmentation)
+    const existingStar = db
+      .prepare("SELECT id FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = ?")
+      .get(userId, ref.item_id, newStarLevel) as { id: number } | undefined;
+
+    let newInventoryId: number;
+    if (existingStar) {
+      db.prepare("UPDATE player_inventory SET quantity = quantity + 1, display_style = ? WHERE id = ?").run(resolvedStyle, existingStar.id);
+      newInventoryId = existingStar.id;
+    } else {
+      const ins = db.prepare(
+        "INSERT INTO player_inventory (user_id, item_id, quantity, star_level, display_style) VALUES (?, ?, 1, ?, ?)"
+      ).run(userId, ref.item_id, newStarLevel, resolvedStyle);
+      newInventoryId = Number(ins.lastInsertRowid);
+    }
+
+    // If the referenced row was equipped, redirect to the new fused row
     const wasEquipped = db
       .prepare(
         "SELECT * FROM player_equipped WHERE user_id = ? AND (equipped_title_inventory_id = ? OR equipped_object_inventory_id = ?)"
@@ -447,9 +477,9 @@ router.post("/fuse", authMiddleware, (req: AuthenticatedRequest, res) => {
 
     res.json({
       success: true,
-      item_name: source.name,
+      item_name: ref.name,
       new_star_level: newStarLevel,
-      base_value: source.base_value,
+      base_value: ref.base_value,
     });
   } catch (err) {
     console.error("[shop] Erreur fuse:", err);
@@ -799,6 +829,8 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       return;
     }
 
+    let displayStyle = "default";
+
     // Handle stocks
     if (catalogItem.category === "stock") {
       if (catalogItem.name === "GOGO Coin") {
@@ -819,7 +851,7 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       }
       db.prepare("UPDATE players SET loto_tickets = loto_tickets + 1 WHERE user_id = ?").run(userId);
     } else {
-      const displayStyle = rollDisplayStyle(catalogItem.rarity);
+      displayStyle = rollDisplayStyle(catalogItem.rarity);
       const existing = db
         .prepare("SELECT id, quantity FROM player_inventory WHERE user_id = ? AND item_id = ? AND star_level = 0")
         .get(userId, catalogItem.id) as { id: number; quantity: number } | undefined;
@@ -848,6 +880,7 @@ router.post("/daily-free-box", authMiddleware, (req: AuthenticatedRequest, res) 
       rarityColor: RARITY_MAP[rolledRarity as keyof typeof RARITY_MAP]?.color ?? "#999999",
       player: updatedPlayer,
       free: true,
+      displayStyle,
     });
   } catch (err) {
     console.error("[shop] Erreur daily-free-box:", err);
@@ -979,6 +1012,57 @@ router.post("/use-consumable", authMiddleware, (req: AuthenticatedRequest, res) 
   }
 });
 
+// ─── Collection stats ────────────────────────────────────────────
+
+router.get("/collection-stats", authMiddleware, (req: AuthenticatedRequest, res) => {
+  try {
+    const db = getDb();
+    const userId = req.userId!;
+
+    const TRACKED_CATEGORIES = [
+      { key: "fruit",   label: "Fruits",       emoji: "🍎" },
+      { key: "burger",  label: "Burgers",       emoji: "🍔" },
+      { key: "title",   label: "Titres",        emoji: "🏅" },
+      { key: "people",  label: "Personnages",   emoji: "👤" },
+    ] as const;
+
+    const categories = TRACKED_CATEGORIES.map(({ key, label, emoji }) => {
+      const { total } = db
+        .prepare("SELECT COUNT(*) as total FROM items_catalog WHERE category = ?")
+        .get(key) as { total: number };
+
+      const { owned } = db
+        .prepare(
+          `SELECT COUNT(DISTINCT pi.item_id) as owned
+           FROM player_inventory pi
+           JOIN items_catalog ic ON pi.item_id = ic.id
+           WHERE pi.user_id = ? AND pi.quantity > 0 AND ic.category = ?`
+        )
+        .get(userId, key) as { owned: number };
+
+      return { key, label, emoji, owned, total };
+    });
+
+    const { uniqueTotal } = db
+      .prepare("SELECT COUNT(*) as uniqueTotal FROM items_catalog WHERE rarity = 'unique'")
+      .get() as { uniqueTotal: number };
+
+    const { uniqueOwned } = db
+      .prepare(
+        `SELECT COUNT(DISTINCT pi.item_id) as uniqueOwned
+         FROM player_inventory pi
+         JOIN items_catalog ic ON pi.item_id = ic.id
+         WHERE ic.rarity = 'unique' AND pi.quantity > 0`
+      )
+      .get() as { uniqueOwned: number };
+
+    res.json({ categories, uniqueGlobal: { owned: uniqueOwned, total: uniqueTotal } });
+  } catch (err) {
+    console.error("[shop] Erreur collection-stats:", err);
+    res.status(500).json({ error: "Erreur serveur" });
+  }
+});
+
 // ─── Daily Deals ─────────────────────────────────────────────────
 
 function getTodayDealDateStr(): string {
@@ -1095,8 +1179,13 @@ router.get("/daily-deals", authMiddleware, (req: AuthenticatedRequest, res) => {
     const purchasedIds = new Set(purchases.map((p) => p.deal_id));
 
     const now = new Date();
-    const tomorrowAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
-    const nextRefreshMs = tomorrowAt9.getTime() - now.getTime();
+    const todayAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
+    // Si avant 9h, le reset est à 9h aujourd'hui (les deals affichés sont ceux d'hier)
+    // Si après 9h, le reset est à 9h demain
+    const resetTime = now < todayAt9
+      ? todayAt9
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0);
+    const nextRefreshMs = resetTime.getTime() - now.getTime();
 
     res.json({
       deals: deals.map((d) => ({ ...d, purchased: purchasedIds.has(d.id) })),

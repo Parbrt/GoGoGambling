@@ -330,6 +330,7 @@ export const api = {
         rolledRarity: string;
         rarityColor: string;
         player: PlayerType;
+        displayStyle: string;
       }>("/api/shop/open-box", { boxType }),
     inventory: () => get<Array<{
       id: number;
@@ -358,10 +359,10 @@ export const api = {
         equipped_title: Record<string, unknown> | null;
         equipped_object: Record<string, unknown> | null;
       }>(`/api/shop/equipped${userId ? `/${userId}` : ""}`),
-    fuse: (inventoryId: number) =>
+    fuse: (inventoryId: number, displayStyle?: string) =>
       post<{ success: boolean; item_name: string; new_star_level: number; base_value: number }>(
         "/api/shop/fuse",
-        { inventoryId }
+        { inventoryId, displayStyle }
       ),
     boxHistory: () => get<Array<Record<string, unknown>>>("/api/shop/box-history"),
     dailyFreeBox: () =>
@@ -371,6 +372,7 @@ export const api = {
         rarityColor: string;
         player: PlayerType;
         free: boolean;
+        displayStyle: string;
       }>("/api/shop/daily-free-box"),
     useConsumable: (inventoryId: number) =>
       post<{
@@ -403,6 +405,11 @@ export const api = {
         player: PlayerType;
         deal: { id: number; name: string; price: number; emoji: string; rarity: string };
       }>("/api/shop/buy-daily-deal", { dealId }),
+    collectionStats: () =>
+      get<{
+        categories: Array<{ key: string; label: string; emoji: string; owned: number; total: number }>;
+        uniqueGlobal: { owned: number; total: number };
+      }>("/api/shop/collection-stats"),
     marketplace: {
       list: (inventoryId: number, quantity: number, price: number) =>
         post<{ success: boolean; listingId: number }>("/api/shop/marketplace/list", {

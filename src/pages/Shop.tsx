@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ArrowUpRight, Loader2, Sparkles, Star, X, Gift, BarChart3, Clock, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { api } from "@/lib/api";
 import { cacheGet, cacheHas } from "@/lib/cache";
 import { Button } from "@/components/ui/button";
+import { getStyleDef, RARITY_HEX } from "@/lib/displayStyles";
 import type { PlayerType } from "@/types";
 
 // ─── Types ───
@@ -31,7 +32,26 @@ interface BoxResult {
   rolledRarity: string;
   rarityColor: string;
   player: PlayerType;
+  displayStyle: string;
 }
+
+const DISPLAY_STYLE_LABELS: Record<string, string> = {
+  default: "Normal",
+  bold: "Gras",
+  italic: "Italique",
+  bold_italic: "Gras + Italique",
+  underline: "Souligné",
+  strikethrough: "Barré",
+  tinted: "Teinté",
+  tinted_bold: "Teinté + Gras",
+  glow: "Brillant",
+  glow_bold: "Brillant + Gras",
+  solid: "Plein",
+  solid_italic: "Plein + Italique",
+  outlined: "Contour",
+  gradient: "Dégradé",
+  rainbow: "Arc-en-ciel",
+};
 
 interface ShopPageProps {
   player: PlayerType;
@@ -118,6 +138,18 @@ const BOX_GRADIENTS: Record<string, string> = {
   XBOX: "linear-gradient(135deg, #3860BE 0%, #141413 100%)",
 };
 
+interface CollectionStats {
+  categories: Array<{ key: string; label: string; emoji: string; owned: number; total: number }>;
+  uniqueGlobal: { owned: number; total: number };
+}
+
+const CATEGORY_COLORS: Record<string, { icon: string; bar: string }> = {
+  fruit:  { icon: "from-orange-400 to-orange-600", bar: "from-orange-400 to-orange-600" },
+  burger: { icon: "from-purple-400 to-purple-600", bar: "from-purple-400 to-purple-600" },
+  title:  { icon: "from-blue-400 to-indigo-600",   bar: "from-blue-400 to-indigo-600" },
+  people: { icon: "from-yellow-300 to-amber-500",  bar: "from-yellow-300 to-amber-500" },
+};
+
 // ─── Spring configs ───
 
 const springBouncy = { type: "spring" as const, stiffness: 300, damping: 18 };
@@ -165,8 +197,7 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
   const PITY_THRESHOLD = 60;
   const isPityActive = pityCounter >= PITY_THRESHOLD;
 
-  // Phase 8: Collection progress
-  const [inventory, setInventory] = useState<Array<{ name: string; category: string; emoji: string }>>([]);
+  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [boxHistory, setBoxHistory] = useState<Array<{ name: string; emoji: string; rarity: string; acquired_at: string }>>([]);
   const [freeBoxAvailable, setFreeBoxAvailable] = useState(false);
   const [freeBoxLoading, setFreeBoxLoading] = useState(false);
@@ -179,11 +210,6 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
   const [nextDealRefreshMs, setNextDealRefreshMs] = useState(0);
   const [dealLoading, setDealLoading] = useState<number | null>(null);
 
-  const TOTAL_FRUITS = 28;
-  const collectedFruits = useMemo(() => {
-    const fruitSet = new Set(inventory.filter((i) => i.category === "fruit").map((i) => i.name));
-    return fruitSet.size;
-  }, [inventory]);
 
   useEffect(() => {
     api.shop.boxes()
@@ -191,9 +217,9 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // Load inventory for collection tracker
-    api.shop.inventory()
-      .then((inv) => setInventory(inv as Array<{ name: string; category: string; emoji: string }>))
+    // Load collection stats
+    api.shop.collectionStats()
+      .then((stats) => setCollectionStats(stats))
       .catch(() => {});
 
     // Load box history
@@ -259,8 +285,8 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
         localStorage.setItem("ggg_pity", String(next));
       }
 
-      api.shop.inventory()
-        .then((inv) => setInventory(inv as Array<{ name: string; category: string; emoji: string }>))
+      api.shop.collectionStats()
+        .then((stats) => setCollectionStats(stats))
         .catch(() => {});
       api.shop.boxHistory()
         .then((h) => setBoxHistory(h as Array<{ name: string; emoji: string; rarity: string; acquired_at: string }>))
@@ -287,27 +313,53 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
 
   async function handleFreeBox() {
     setFreeBoxLoading(true);
+    setOpening(true);
+    setOpeningBoxKey("XBOX");
+    setShowShake(true);
+    setShowFlash(false);
+    setResult(null);
+    setParticles([]);
+    setError(null);
+    setRevealRarity(null);
+
+    const minShake = new Promise<void>((r) => setTimeout(r, 1400));
+    const apiPromise = api.shop.dailyFreeBox();
+
     try {
-      const data = await api.shop.dailyFreeBox();
+      const [, data] = await Promise.all([minShake, apiPromise]);
+
+      setShowShake(false);
+      setRevealRarity(data.rolledRarity);
+      await new Promise((r) => setTimeout(r, 80));
+
+      setShowFlash(true);
+      await new Promise((r) => setTimeout(r, 340));
+      setShowFlash(false);
+      await new Promise((r) => setTimeout(r, 80));
+
       const boxResult: BoxResult = {
         item: data.item as BoxResult["item"],
         rolledRarity: data.rolledRarity,
         rarityColor: data.rarityColor,
         player: data.player,
+        displayStyle: data.displayStyle,
       };
       setResult(boxResult);
       setParticles(spawnParticles(data.rolledRarity));
       onPlayerUpdate(data.player);
       setFreeBoxAvailable(false);
-      // Reload inventory & history
-      api.shop.inventory()
-        .then((inv) => setInventory(inv as Array<{ name: string; category: string; emoji: string }>))
+      api.shop.collectionStats()
+        .then((stats) => setCollectionStats(stats))
         .catch(() => {});
       api.shop.boxHistory()
         .then((h) => setBoxHistory(h as Array<{ name: string; emoji: string; rarity: string; acquired_at: string }>))
         .catch(() => {});
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Erreur box gratuite");
+      setOpening(false);
+      setOpeningBoxKey(null);
+      setShowShake(false);
+      setRevealRarity(null);
     } finally {
       setFreeBoxLoading(false);
     }
@@ -445,23 +497,32 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
           </div>
         </div>
 
-        {/* Collection progress */}
+        {/* Collection totale */}
         <div className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[24px] p-5 flex items-center gap-4 halo-soft">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#F37338] to-[#9A3A0A] flex items-center justify-center text-xl shrink-0">
-            <span className="text-white text-lg">🍎</span>
+          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center text-xl shrink-0">
+            <span className="text-white text-lg">🏆</span>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-[#141413]">Collection fruits</p>
-            <p className="text-xs tabular-nums text-[#696969]">
-              {collectedFruits} / {TOTAL_FRUITS}
-              {collectedFruits >= TOTAL_FRUITS && <span className="ml-1 text-[#F37338] font-bold">Complète !</span>}
-            </p>
-            <div className="mt-1 h-1 bg-[#E8E4E0] rounded-full overflow-hidden w-20">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#F37338] to-[#9A3A0A] transition-all duration-300"
-                style={{ width: `${(collectedFruits / TOTAL_FRUITS) * 100}%` }}
-              />
-            </div>
+            <p className="text-xs font-medium text-[#141413]">Collection</p>
+            {collectionStats ? (() => {
+              const totalOwned = collectionStats.categories.reduce((s, c) => s + c.owned, 0);
+              const totalItems = collectionStats.categories.reduce((s, c) => s + c.total, 0);
+              const pct = totalItems > 0 ? (totalOwned / totalItems) * 100 : 0;
+              return (
+                <>
+                  <p className="text-xs tabular-nums text-[#696969]">
+                    {totalOwned} / {totalItems} types
+                    {totalOwned >= totalItems && totalItems > 0 && <span className="ml-1 text-[#F37338] font-bold">Complète !</span>}
+                  </p>
+                  <div className="mt-1 h-1 bg-[#E8E4E0] rounded-full overflow-hidden w-20">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })() : <p className="text-xs text-[#D1CDC7]">Chargement...</p>}
           </div>
         </div>
       </div>
@@ -561,6 +622,111 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
           );
         })}
       </div>
+
+      {/* ─── Collections ─── */}
+      <section className="mb-16 pt-12 border-t border-[#D1CDC7]">
+        <div className="space-y-3 mb-10">
+          <span className="eyebrow">Collections</span>
+          <h2 className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#141413]">
+            Complétez votre<br />
+            <span className="text-[#9A3A0A]">collection.</span>
+          </h2>
+          <p className="text-sm text-[#555555] max-w-md leading-relaxed">
+            Chaque catégorie a ses propres objets à débloquer. Les uniques ne peuvent appartenir qu&apos;à un seul joueur.
+          </p>
+        </div>
+
+        {/* Personal category bars */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {collectionStats ? collectionStats.categories.map((cat, i) => {
+            const colors = CATEGORY_COLORS[cat.key] ?? { icon: "from-gray-400 to-gray-600", bar: "from-gray-400 to-gray-600" };
+            const pct = cat.total > 0 ? (cat.owned / cat.total) * 100 : 0;
+            return (
+              <motion.div
+                key={cat.key}
+                className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[24px] p-5 flex items-center gap-4 halo-soft"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ ...springGentle, delay: i * 0.07 }}
+              >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shrink-0 bg-gradient-to-br ${colors.icon}`}>
+                  <span>{cat.emoji}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-baseline mb-1">
+                    <p className="text-xs font-medium text-[#141413]">{cat.label}</p>
+                    <span className="text-xs tabular-nums text-[#696969]">{cat.owned} / {cat.total}</span>
+                  </div>
+                  <div className="h-1.5 bg-[#E8E4E0] rounded-full overflow-hidden">
+                    <motion.div
+                      className={`h-full rounded-full bg-gradient-to-r ${colors.bar}`}
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${pct}%` }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.8, delay: i * 0.07 }}
+                    />
+                  </div>
+                  {cat.owned >= cat.total && cat.total > 0 && (
+                    <p className="text-[10px] text-[#F37338] font-bold mt-0.5">Complète !</p>
+                  )}
+                </div>
+              </motion.div>
+            );
+          }) : (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-[#FCFBFA] border border-[#D1CDC7] rounded-[24px] p-5 h-[72px] animate-pulse" />
+            ))
+          )}
+        </div>
+
+        {/* Global unique items bar */}
+        {collectionStats && (
+          <motion.div
+            className="rounded-[32px] bg-[#141413] p-7 md:p-9 text-white"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={springGentle}
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💎</span>
+                  <span className="text-xs uppercase tracking-[0.14em] text-[#999999]">Objets Uniques — Mondial</span>
+                </div>
+                <div>
+                  <span className="text-3xl md:text-4xl font-medium tracking-[-0.03em]">
+                    {collectionStats.uniqueGlobal.owned}
+                  </span>
+                  <span className="text-lg text-[#696969]"> / {collectionStats.uniqueGlobal.total}</span>
+                </div>
+                <p className="text-sm text-[#696969] max-w-xs leading-relaxed">
+                  Uniques en circulation parmi tous les joueurs. Chaque drop est historique — un seul propriétaire possible.
+                </p>
+              </div>
+              <div className="flex-1 max-w-sm">
+                <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-500"
+                    initial={{ width: 0 }}
+                    whileInView={{ width: `${collectionStats.uniqueGlobal.total > 0 ? (collectionStats.uniqueGlobal.owned / collectionStats.uniqueGlobal.total) * 100 : 0}%` }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-[#696969]">
+                  <span>0</span>
+                  <span className="text-[#999999]">
+                    {collectionStats.uniqueGlobal.owned} possédé{collectionStats.uniqueGlobal.owned > 1 ? "s" : ""}
+                  </span>
+                  <span>{collectionStats.uniqueGlobal.total}</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </section>
 
       {/* ═══════════════════════════════════════════════════════
           CONFIRMATION MODAL
@@ -817,6 +983,25 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
                         <Sparkles className="w-3 h-3" />
                         {RARITY_LABELS[result.rolledRarity] || result.rolledRarity}
                       </motion.span>
+
+                      {/* Display style modifier */}
+                      {result.displayStyle && result.displayStyle !== "default" && (() => {
+                        const sd = getStyleDef(result.displayStyle);
+                        const hex = RARITY_HEX[result.rolledRarity] ?? RARITY_HEX.common;
+                        const label = DISPLAY_STYLE_LABELS[result.displayStyle] || result.displayStyle;
+                        return (
+                          <motion.span
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.04em]"
+                            style={sd.container(hex)}
+                            variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
+                          >
+                            <span className={sd.textClass} style={sd.textStyle(hex)}>
+                              {label}
+                            </span>
+                          </motion.span>
+                        );
+                      })()}
+
                       <motion.h3
                         className="text-2xl font-medium tracking-[-0.02em] text-[#141413]"
                         variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
@@ -839,7 +1024,7 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
                       )}
                     </motion.div>
 
-                    {result.item.qualifyable && (
+                    {!!result.item.qualifyable && (
                       <motion.div
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#F37338]/10 text-[#CF4500] text-xs font-medium"
                         initial={{ opacity: 0, scale: 0.8 }}
@@ -847,7 +1032,7 @@ export function Shop({ player, onPlayerUpdate }: ShopPageProps) {
                         transition={{ delay: 0.6, ...springGentle }}
                       >
                         <Star className="w-3 h-3" />
-                        Fusionnable (5→1★ / 2→★+)
+                        Fusionnable (×2 → ★)
                       </motion.div>
                     )}
 

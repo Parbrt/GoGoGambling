@@ -69,7 +69,6 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
       setWinningNumber(result.winningNumber);
       winningNumberRef.current = result.winningNumber;
       setIsWin(result.isWin);
-      onPointsUpdate(result.player.nb_point);
 
       const multiplier = betType === "odd-even" ? 2 : 36;
       if (result.isWin) {
@@ -85,10 +84,11 @@ export function Roulette({ currentPoints, onPointsUpdate }: RouletteProps) {
       setPhase("spinning");
       setTimeout(() => setStartSpinning(true), 100);
 
-      // Go to result after spin
+      // Go to result after spin — update points only after animation completes
       setTimeout(() => {
         setPhase("result");
         setStartSpinning(false);
+        onPointsUpdate(result.player.nb_point);
         winningNumberRef.current = null;
       }, 5500);
     } catch (err: unknown) {

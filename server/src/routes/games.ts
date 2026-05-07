@@ -94,7 +94,7 @@ router.post("/slot/spin", authMiddleware, (req: AuthenticatedRequest, res) => {
     const now = new Date();
     const elapsedDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
     if (elapsedDays > 0) {
-      machinePoints += elapsedDays * 5000;
+      machinePoints += elapsedDays * 2000;
     }
   }
 
@@ -140,7 +140,7 @@ router.get("/slot/jackpot", (_req, res) => {
     const lastUpdate = new Date(jackpot.updated_at);
     const now = new Date();
     const elapsedDays = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
-    if (elapsedDays > 0) points += elapsedDays * 5000;
+    if (elapsedDays > 0) points += elapsedDays * 2000;
   }
 
   res.json({ jackpot: points });

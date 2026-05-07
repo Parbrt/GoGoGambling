@@ -82,6 +82,9 @@ export function initSchema(): void {
   // Migrate: add display_style column to player_inventory
   migrateDisplayStyleColumn(db);
 
+  // Migrate: make non-unique titles qualifyable
+  migrateTitlesQualifyable(db);
+
   // Create baby fight tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS baby_fights (
@@ -472,6 +475,10 @@ function migrateDisplayStyleColumn(db: ReturnType<typeof getDb>): void {
     db.prepare("ALTER TABLE player_inventory ADD COLUMN display_style TEXT NOT NULL DEFAULT 'default'").run();
     console.log("[schema] Added display_style column to player_inventory");
   }
+}
+
+function migrateTitlesQualifyable(db: ReturnType<typeof getDb>): void {
+  db.prepare("UPDATE items_catalog SET qualifyable = 1 WHERE category = 'title' AND rarity != 'unique'").run();
 }
 
 function migrateChickenChargesColumns(db: ReturnType<typeof getDb>): void {

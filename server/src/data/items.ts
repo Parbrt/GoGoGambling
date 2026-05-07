@@ -165,43 +165,43 @@ export const ITEMS_CATALOG: CatalogItem[] = [
   { name: "Onion Rings",                  category: "burger", rarity: "epic", base_value: 50000,  qualifyable: true, emoji: "🧅", description: "Des rondelles d'oignon croustillantes à souhait." },
 
   // ▸▸▸ TITLES — Common
-  { name: "Joueur du Dimanche",  category: "title", rarity: "common", base_value: 100, qualifyable: false,  emoji: "🎮", description: "Il vient surtout pour l'ambiance." },
-  { name: "Le Curieux",          category: "title", rarity: "common", base_value: 100, qualifyable: false,  emoji: "👀", description: "Il ouvre des box juste pour voir." },
-  { name: "Tocard Heureux",      category: "title", rarity: "common", base_value: 100, qualifyable: false,  emoji: "🍀", description: "Même un pigeon peut avoir de la chance." },
-  { name: "Flambeur Débutant",   category: "title", rarity: "common", base_value: 100, qualifyable: false,  emoji: "💸", description: "Il mise petit mais il mise." },
+  { name: "Joueur du Dimanche",  category: "title", rarity: "common", base_value: 100, qualifyable: true,  emoji: "🎮", description: "Il vient surtout pour l'ambiance." },
+  { name: "Le Curieux",          category: "title", rarity: "common", base_value: 100, qualifyable: true,  emoji: "👀", description: "Il ouvre des box juste pour voir." },
+  { name: "Tocard Heureux",      category: "title", rarity: "common", base_value: 100, qualifyable: true,  emoji: "🍀", description: "Même un pigeon peut avoir de la chance." },
+  { name: "Flambeur Débutant",   category: "title", rarity: "common", base_value: 100, qualifyable: true,  emoji: "💸", description: "Il mise petit mais il mise." },
 
   // ▸▸▸ TITLES — Rare
-  { name: "Lucky Luke",          category: "title", rarity: "rare", base_value: 2000, qualifyable: false, emoji: "🤠", description: "Plus rapide que son ombre." },
-  { name: "Parieur Aguerri",     category: "title", rarity: "rare", base_value: 2000, qualifyable: false, emoji: "🎯", description: "Il a vu assez de box pour savoir." },
-  { name: "Dompteur de RNG",     category: "title", rarity: "rare", base_value: 2000, qualifyable: false, emoji: "🎲", description: "Il parle au hasard et le hasard répond." },
-  { name: "Surfeur de la Chance",category: "title", rarity: "rare", base_value: 2000, qualifyable: false, emoji: "🏄", description: "Il surfe sur les probabilités." },
-  { name: "L'Insomniaque",       category: "title", rarity: "rare", base_value: 2000, qualifyable: false, emoji: "🦉", description: "La nuit, il ouvre des box." },
+  { name: "Lucky Luke",          category: "title", rarity: "rare", base_value: 2000, qualifyable: true, emoji: "🤠", description: "Plus rapide que son ombre." },
+  { name: "Parieur Aguerri",     category: "title", rarity: "rare", base_value: 2000, qualifyable: true, emoji: "🎯", description: "Il a vu assez de box pour savoir." },
+  { name: "Dompteur de RNG",     category: "title", rarity: "rare", base_value: 2000, qualifyable: true, emoji: "🎲", description: "Il parle au hasard et le hasard répond." },
+  { name: "Surfeur de la Chance",category: "title", rarity: "rare", base_value: 2000, qualifyable: true, emoji: "🏄", description: "Il surfe sur les probabilités." },
+  { name: "L'Insomniaque",       category: "title", rarity: "rare", base_value: 2000, qualifyable: true, emoji: "🦉", description: "La nuit, il ouvre des box." },
 
   // ▸▸▸ TITLES — Epic
-  { name: "High Roller",         category: "title", rarity: "epic", base_value: 50000, qualifyable: false,  emoji: "🎩", description: "Quand il mise, la table tremble." },
-  { name: "Maître du Casino",    category: "title", rarity: "epic", base_value: 50000, qualifyable: false,  emoji: "🏛️", description: "Le casino, c'est chez lui." },
-  { name: "Le Visionnaire",      category: "title", rarity: "epic", base_value: 50000, qualifyable: false,  emoji: "🔮", description: "Il voit les raretés avant qu'elles n'apparaissent." },
-  { name: "Croupier Suprême",    category: "title", rarity: "epic", base_value: 50000, qualifyable: false,  emoji: "🃏", description: "Il distribue la chance." },
-  { name: "Serial Opener",       category: "title", rarity: "epic", base_value: 50000, qualifyable: false,  emoji: "📦", description: "Des centaines de box ouvertes, jamais rassasié." },
+  { name: "High Roller",         category: "title", rarity: "epic", base_value: 50000, qualifyable: true,  emoji: "🎩", description: "Quand il mise, la table tremble." },
+  { name: "Maître du Casino",    category: "title", rarity: "epic", base_value: 50000, qualifyable: true,  emoji: "🏛️", description: "Le casino, c'est chez lui." },
+  { name: "Le Visionnaire",      category: "title", rarity: "epic", base_value: 50000, qualifyable: true,  emoji: "🔮", description: "Il voit les raretés avant qu'elles n'apparaissent." },
+  { name: "Croupier Suprême",    category: "title", rarity: "epic", base_value: 50000, qualifyable: true,  emoji: "🃏", description: "Il distribue la chance." },
+  { name: "Serial Opener",       category: "title", rarity: "epic", base_value: 50000, qualifyable: true,  emoji: "📦", description: "Des centaines de box ouvertes, jamais rassasié." },
 
   // ▸▸▸ TITLES — Legendary
-  { name: "Roi du GOGO",        category: "title", rarity: "legendary", base_value: 150000, qualifyable: false, emoji: "👑", description: "Le roi incontesté du gambling." },
-  { name: "L'Élu de la Chance",  category: "title", rarity: "legendary", base_value: 150000, qualifyable: false, emoji: "✨", description: "La chance l'a choisi." },
-  { name: "La Légende",          category: "title", rarity: "legendary", base_value: 150000, qualifyable: false, emoji: "🌟", description: "On raconte encore ses exploits." },
-  { name: "Dieu du Gambling",    category: "title", rarity: "legendary", base_value: 150000, qualifyable: false, emoji: "⚡", description: "Les probas se plient à sa volonté." },
-  { name: "Collectionneur Fou",  category: "title", rarity: "legendary", base_value: 150000, qualifyable: false, emoji: "🧩", description: "Il lui faut TOUS les items." },
+  { name: "Roi du GOGO",        category: "title", rarity: "legendary", base_value: 150000, qualifyable: true, emoji: "👑", description: "Le roi incontesté du gambling." },
+  { name: "L'Élu de la Chance",  category: "title", rarity: "legendary", base_value: 150000, qualifyable: true, emoji: "✨", description: "La chance l'a choisi." },
+  { name: "La Légende",          category: "title", rarity: "legendary", base_value: 150000, qualifyable: true, emoji: "🌟", description: "On raconte encore ses exploits." },
+  { name: "Dieu du Gambling",    category: "title", rarity: "legendary", base_value: 150000, qualifyable: true, emoji: "⚡", description: "Les probas se plient à sa volonté." },
+  { name: "Collectionneur Fou",  category: "title", rarity: "legendary", base_value: 150000, qualifyable: true, emoji: "🧩", description: "Il lui faut TOUS les items." },
 
   // ▸▸▸ TITLES — Mythic
-  { name: "Dragon de Jade",      category: "title", rarity: "mythic", base_value: 350000, qualifyable: false, emoji: "🐉", description: "Une créature mythique aux griffes de chance." },
-  { name: "Prophète du RNG",     category: "title", rarity: "mythic", base_value: 350000, qualifyable: false, emoji: "📜", description: "Il a prédit chaque drop." },
-  { name: "Être Cosmique",       category: "title", rarity: "mythic", base_value: 350000, qualifyable: false, emoji: "🌌", description: "Son existence défie les probabilités." },
-  { name: "L'Insaisissable",     category: "title", rarity: "mythic", base_value: 350000, qualifyable: false, emoji: "👻", description: "On le voit rarement, on ne l'oublie jamais." },
+  { name: "Dragon de Jade",      category: "title", rarity: "mythic", base_value: 350000, qualifyable: true, emoji: "🐉", description: "Une créature mythique aux griffes de chance." },
+  { name: "Prophète du RNG",     category: "title", rarity: "mythic", base_value: 350000, qualifyable: true, emoji: "📜", description: "Il a prédit chaque drop." },
+  { name: "Être Cosmique",       category: "title", rarity: "mythic", base_value: 350000, qualifyable: true, emoji: "🌌", description: "Son existence défie les probabilités." },
+  { name: "L'Insaisissable",     category: "title", rarity: "mythic", base_value: 350000, qualifyable: true, emoji: "👻", description: "On le voit rarement, on ne l'oublie jamais." },
 
   // ▸▸▸ TITLES — Exotic
-  { name: "Astral",              category: "title", rarity: "exotic", base_value: 750000, qualifyable: false, emoji: "🌠", description: "Une présence venue d'ailleurs." },
-  { name: "Nébuleux",            category: "title", rarity: "exotic", base_value: 750000, qualifyable: false, emoji: "🌫️", description: "Entouré de mystère et de rareté." },
-  { name: "Flamboyant",          category: "title", rarity: "exotic", base_value: 750000, qualifyable: false, emoji: "🔥", description: "Son style brûle le leaderboard." },
-  { name: "Phénix",              category: "title", rarity: "exotic", base_value: 750000, qualifyable: false, emoji: "🦅", description: "Renaît de ses cendres, toujours plus fort." },
+  { name: "Astral",              category: "title", rarity: "exotic", base_value: 750000, qualifyable: true, emoji: "🌠", description: "Une présence venue d'ailleurs." },
+  { name: "Nébuleux",            category: "title", rarity: "exotic", base_value: 750000, qualifyable: true, emoji: "🌫️", description: "Entouré de mystère et de rareté." },
+  { name: "Flamboyant",          category: "title", rarity: "exotic", base_value: 750000, qualifyable: true, emoji: "🔥", description: "Son style brûle le leaderboard." },
+  { name: "Phénix",              category: "title", rarity: "exotic", base_value: 750000, qualifyable: true, emoji: "🦅", description: "Renaît de ses cendres, toujours plus fort." },
 
   // ▸▸▸ TITLES — Unique
   { name: "L'Incontournable",    category: "title", rarity: "unique", base_value: 0, qualifyable: false, emoji: "💎", description: "Impossible de passer à côté de lui." },

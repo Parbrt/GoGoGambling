@@ -51,31 +51,71 @@ router.get("/me", authMiddleware, (req: AuthenticatedRequest, res) => {
 // GET /api/player/:id
 router.get("/:id", (req, res) => {
   const db = getDb();
-  const player = db
+  const numericId = parseInt(req.params.id, 10);
+  if (isNaN(numericId)) { res.status(400).json({ error: "ID invalide" }); return; }
+
+  const row = db
     .prepare(
-      "SELECT id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B, is_online, last_seen, profile_photo, peak_net_worth FROM players WHERE id = ?"
+      "SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B, is_online, last_seen, profile_photo, peak_net_worth FROM players WHERE id = ?"
     )
-    .get(parseInt(req.params.id, 10)) as {
-    id: number;
-    player_name: string;
-    nb_point: number;
-    nb_debt: number;
-    nb_share_A: number;
-    nb_share_B: number;
-    is_online: number;
-    last_seen: string | null;
-    profile_photo: string | null;
-    peak_net_worth: number;
-  } | undefined;
+    .get(numericId) as {
+      id: number; user_id: string; player_name: string;
+      nb_point: number; nb_debt: number; nb_share_A: number; nb_share_B: number;
+      is_online: number; last_seen: string | null; profile_photo: string | null;
+      peak_net_worth: number;
+    } | undefined;
 
-  if (!player) {
-    res.status(404).json({ error: "Joueur introuvable" });
-    return;
-  }
+  if (!row) { res.status(404).json({ error: "Joueur introuvable" }); return; }
 
+  // Equipped items
+  const equipped = db.prepare(`
+    SELECT
+      tc.name  AS equipped_title_name,  tc.emoji AS equipped_title_emoji,
+      tc.rarity AS equipped_title_rarity, ti.display_style AS equipped_title_display_style,
+      ti.star_level AS equipped_title_star_level,
+      oc.name  AS equipped_object_name, oc.emoji AS equipped_object_emoji,
+      oc.rarity AS equipped_object_rarity, oi.display_style AS equipped_object_display_style,
+      oi.star_level AS equipped_object_star_level
+    FROM player_equipped pe
+    LEFT JOIN player_inventory ti ON pe.equipped_title_inventory_id  = ti.id
+    LEFT JOIN items_catalog    tc ON ti.item_id = tc.id
+    LEFT JOIN player_inventory oi ON pe.equipped_object_inventory_id = oi.id
+    LEFT JOIN items_catalog    oc ON oi.item_id = oc.id
+    WHERE pe.user_id = ?
+  `).get(row.user_id) as Record<string, unknown> | undefined;
+
+  // Collection stats for this player
+  const TRACKED = [
+    { key: "fruit",  label: "Fruits",      emoji: "🍎" },
+    { key: "burger", label: "Burgers",     emoji: "🍔" },
+    { key: "title",  label: "Titres",      emoji: "🏅" },
+    { key: "people", label: "Personnages", emoji: "👤" },
+  ] as const;
+
+  const categories = TRACKED.map(({ key, label, emoji }) => {
+    const { total } = db.prepare("SELECT COUNT(*) as total FROM items_catalog WHERE category = ?").get(key) as { total: number };
+    const { owned } = db.prepare(
+      `SELECT COUNT(DISTINCT pi.item_id) as owned FROM player_inventory pi
+       JOIN items_catalog ic ON pi.item_id = ic.id
+       WHERE pi.user_id = ? AND pi.quantity > 0 AND ic.category = ?`
+    ).get(row.user_id, key) as { owned: number };
+    return { key, label, emoji, owned, total };
+  });
+
+  const { uniqueTotal } = db.prepare("SELECT COUNT(*) as uniqueTotal FROM items_catalog WHERE rarity = 'unique'").get() as { uniqueTotal: number };
+  const { uniqueOwned } = db.prepare(
+    `SELECT COUNT(DISTINCT pi.item_id) as uniqueOwned FROM player_inventory pi
+     JOIN items_catalog ic ON pi.item_id = ic.id
+     WHERE ic.rarity = 'unique' AND pi.quantity > 0`
+  ).get() as { uniqueOwned: number };
+
+  const { id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B, is_online, last_seen, profile_photo, peak_net_worth } = row;
   res.json({
-    ...player,
-    is_online: player.is_online === 1,
+    id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B,
+    is_online: is_online === 1,
+    last_seen, profile_photo, peak_net_worth,
+    ...(equipped ?? {}),
+    collection: { categories, uniqueGlobal: { owned: uniqueOwned, total: uniqueTotal } },
   });
 });
 

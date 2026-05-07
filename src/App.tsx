@@ -35,6 +35,8 @@ import { useAutoNotifications } from "@/hooks/useAutoNotifications";
 import { useGlobalNotifications } from "@/hooks/useGlobalNotifications";
 import { useBlackjackNotifications } from "@/hooks/useBlackjackNotifications";
 import { useMarketplaceNotifications } from "@/hooks/useMarketplaceNotifications";
+import { useVersionChecker } from "@/hooks/useVersionChecker";
+import { UpdateBanner } from "@/components/UpdateBanner";
 
 const INIT_TIMEOUT = 10000;
 
@@ -48,6 +50,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
   useGlobalNotifications({ currentUserId: user.id, currentPlayerName: player.player_name });
   useBlackjackNotifications({ currentUserId: user.id });
   useMarketplaceNotifications({ currentUserId: user.id });
+  const updateAvailable = useVersionChecker();
 
   useEffect(() => {
     api.player.setOnline().catch(console.error);
@@ -81,6 +84,7 @@ function AuthenticatedApp({ user, player, setPlayer, handleLogout }: {
     <div className="min-h-screen bg-background flex flex-col">
       <ScrollToTop />
       <NotificationContainer />
+      {updateAvailable && <UpdateBanner />}
       <Header playerName={player.player_name} points={player.nb_point} onLogout={handleLogout} />
       <main className="flex-1">
         <Routes>

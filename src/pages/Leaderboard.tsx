@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { formatCompactPoints } from "@/lib/utils";
 import { motion } from "motion/react";
 import { Loader2, Star } from "lucide-react";
@@ -86,6 +86,32 @@ function useLeaderboardData() {
 export function Leaderboard() {
   const { players, loading, error } = useLeaderboardData();
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onRowEnter = useCallback((id: number) => {
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+    if (selectedPlayerId !== null) return;
+    hoverTimerRef.current = setTimeout(() => setHoveredId(id), 350);
+  }, [selectedPlayerId]);
+
+  const onRowLeave = useCallback(() => {
+    if (hoverTimerRef.current) { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = null; }
+    closeTimerRef.current = setTimeout(() => setHoveredId(null), 220);
+  }, []);
+
+  const onCardEnter = useCallback(() => {
+    if (closeTimerRef.current) { clearTimeout(closeTimerRef.current); closeTimerRef.current = null; }
+  }, []);
+
+  const onCardLeave = useCallback(() => { setHoveredId(null); }, []);
+
+  // Stable reference to avoid recreating callbacks per row
+  const rowHandlers = useMemo(() => ({
+    enter: onRowEnter,
+    leave: onRowLeave,
+  }), [onRowEnter, onRowLeave]);
 
   if (loading) {
     return (
@@ -110,8 +136,23 @@ export function Leaderboard() {
 
   return (
     <>
+      {/* Hover card — no backdrop, closes when mouse leaves */}
+      {hoveredId !== null && selectedPlayerId === null && (
+        <PlayerCard
+          playerId={hoveredId}
+          mode="hover"
+          onClose={() => setHoveredId(null)}
+          onCardMouseEnter={onCardEnter}
+          onCardMouseLeave={onCardLeave}
+        />
+      )}
+      {/* Click card — with backdrop */}
       {selectedPlayerId !== null && (
-        <PlayerCard playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+        <PlayerCard
+          playerId={selectedPlayerId}
+          mode="click"
+          onClose={() => setSelectedPlayerId(null)}
+        />
       )}
       <div className="relative max-w-5xl mx-auto px-6 py-16 md:py-24 space-y-20">
         <section className="relative">
@@ -135,6 +176,8 @@ export function Leaderboard() {
                 player={p}
                 rank={i + 1}
                 onNameClick={() => setSelectedPlayerId(p.id)}
+                onHoverEnter={() => rowHandlers.enter(p.id)}
+                onHoverLeave={rowHandlers.leave}
               />
             ))}
           </section>
@@ -150,19 +193,17 @@ export function Leaderboard() {
                 return (
                   <motion.div
                     key={p.id}
-                    className="flex items-center justify-between px-6 md:px-8 py-5 hover:bg-[#F3F0EE] transition-colors"
+                    className="flex items-center justify-between px-6 md:px-8 py-5 hover:bg-[#F3F0EE] transition-colors cursor-pointer"
                     initial={{ opacity: 0, x: -16 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: rowDelay, duration: 0.35, ease: [0.25, 1, 0.5, 1] }}
+                    onMouseEnter={() => rowHandlers.enter(p.id)}
+                    onMouseLeave={rowHandlers.leave}
+                    onClick={() => setSelectedPlayerId(p.id)}
                   >
                     <div className="flex items-center gap-5 min-w-0">
                       <span className="text-2xl font-medium tracking-[-0.03em] text-[#696969] tabular-nums w-10">#{i + 4}</span>
-                      <div className="flex flex-col items-center shrink-0">
-                        {!!p.is_online && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded-[999px] bg-[#F37338]/10 text-[#F37338] text-[10px] font-medium">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#F37338] live-dot" />En ligne
-                          </span>
-                        )}
+                      <div className="relative shrink-0">
                         <div className="w-11 h-11 rounded-full bg-[#141413] text-[#F3F0EE] flex items-center justify-center font-medium overflow-hidden">
                           {p.profile_photo ? (
                             <img src={p.profile_photo} alt={p.player_name} className="w-full h-full object-cover" />
@@ -170,14 +211,24 @@ export function Leaderboard() {
                             p.player_name.charAt(0).toUpperCase()
                           )}
                         </div>
+                        {!!p.is_online && (
+                          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#F37338] border-2 border-[#FCFBFA]" />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <button
-                          onClick={() => setSelectedPlayerId(p.id)}
-                          className="block font-medium text-[#141413] tracking-[-0.02em] truncate hover:text-[#9A3A0A] transition-colors cursor-pointer text-left"
-                        >
-                          {p.player_name}
-                        </button>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            onClick={() => setSelectedPlayerId(p.id)}
+                            className="font-medium text-[#141413] tracking-[-0.02em] truncate hover:text-[#9A3A0A] transition-colors cursor-pointer text-left"
+                          >
+                            {p.player_name}
+                          </button>
+                          {!!p.is_online && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[999px] bg-[#F37338]/10 text-[#F37338] text-[10px] font-medium shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#F37338] live-dot" />En ligne
+                            </span>
+                          )}
+                        </div>
                         <div className="flex flex-col items-start gap-0.5 mt-1">
                           {p.equipped_title_name && (() => {
                             const hex = RARITY_HEX[p.equipped_title_rarity || ""] ?? RARITY_HEX.common;
@@ -283,10 +334,14 @@ function PodiumCard({
   player,
   rank,
   onNameClick,
+  onHoverEnter,
+  onHoverLeave,
 }: {
   player: LeaderboardPlayer;
   rank: number;
   onNameClick: () => void;
+  onHoverEnter: () => void;
+  onHoverLeave: () => void;
 }) {
   const tones = [
     { gradient: "linear-gradient(135deg, #F4E1C9 0%, #CF4500 100%)", label: "Or" },
@@ -304,7 +359,11 @@ function PodiumCard({
   const delay = (rank - 1) * 0.12;
 
   return (
-    <div className={`relative ${offset}`}>
+    <div
+      className={`relative ${offset}`}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
+    >
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
