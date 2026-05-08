@@ -20,16 +20,20 @@ export function DailyReward({ onRewardClaimed }: DailyRewardProps) {
   const checkRewardStatus = useCallback((playerData: PlayerType) => {
     const now = new Date();
     const todayAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
-    const tomorrowAt9 = new Date(todayAt9);
-    tomorrowAt9.setDate(tomorrowAt9.getDate() + 1);
+    const yesterdayAt9 = new Date(todayAt9);
+    yesterdayAt9.setDate(yesterdayAt9.getDate() - 1);
+    const currentWindowStart = now >= todayAt9 ? todayAt9 : yesterdayAt9;
 
     const lastClaimDate = playerData.last_daily_reward_claim ? new Date(playerData.last_daily_reward_claim) : null;
 
-    if (!lastClaimDate || lastClaimDate < todayAt9) {
+    if (!lastClaimDate || lastClaimDate < currentWindowStart) {
       setCanClaim(true);
     } else {
       setCanClaim(false);
-      const remaining = tomorrowAt9.getTime() - now.getTime();
+      const tomorrowAt9 = new Date(todayAt9);
+      tomorrowAt9.setDate(tomorrowAt9.getDate() + 1);
+      const nextWindowStart = now >= todayAt9 ? tomorrowAt9 : todayAt9;
+      const remaining = nextWindowStart.getTime() - now.getTime();
       const hours = Math.floor(remaining / (1000 * 60 * 60));
       const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
       setTimeRemaining(`${hours}h ${minutes}m`);

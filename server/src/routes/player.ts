@@ -252,9 +252,13 @@ router.post("/daily-reward", authMiddleware, (req: AuthenticatedRequest, res) =>
 
   const now = new Date();
   const todayAt9 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 9, 0);
+  const yesterdayAt9 = new Date(todayAt9);
+  yesterdayAt9.setDate(yesterdayAt9.getDate() - 1);
+  const currentWindowStart = now >= todayAt9 ? todayAt9 : yesterdayAt9;
+
   const lastClaim = player.last_daily_reward_claim ? new Date(player.last_daily_reward_claim) : null;
 
-  if (lastClaim && lastClaim >= todayAt9) {
+  if (lastClaim && lastClaim >= currentWindowStart) {
     res.status(400).json({ error: "Récompense déjà réclamée aujourd'hui" });
     return;
   }
