@@ -211,12 +211,12 @@ export function startNewFight(): BabyFightRow | null {
   }
 
   const allBets = db.prepare(
-    "SELECT player_name, amount, bet_on FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
-  ).all(fight.id) as Array<{ player_name: string; amount: number; bet_on: number }>;
+    "SELECT player_name, amount, bet_on, user_id FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
+  ).all(fight.id) as Array<{ player_name: string; amount: number; bet_on: number; user_id: string }>;
 
   broadcastBabyFight("baby_fight:new", {
     fight: formatFightForClient(fight),
-    bets: allBets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on })),
+    bets: allBets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on, isBot: isBotUserId(b.user_id) })),
     timeRemaining: getTimeRemaining(fight.scheduled_at),
   });
 
@@ -256,23 +256,23 @@ export function getCurrentFight(): {
     if (!newFight) return { fight: null, bets: [], timeRemaining: 0 };
 
     const bets = db.prepare(
-      "SELECT player_name, amount, bet_on FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
-    ).all(newFight.id) as Array<{ player_name: string; amount: number; bet_on: number }>;
+      "SELECT player_name, amount, bet_on, user_id FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
+    ).all(newFight.id) as Array<{ player_name: string; amount: number; bet_on: number; user_id: string }>;
 
     return {
       fight: formatFightForClient(newFight),
-      bets: bets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on })),
+      bets: bets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on, isBot: isBotUserId(b.user_id) })),
       timeRemaining: getTimeRemaining(newFight.scheduled_at),
     };
   }
 
   const bets = db.prepare(
-    "SELECT player_name, amount, bet_on FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
-  ).all(fight.id) as Array<{ player_name: string; amount: number; bet_on: number }>;
+    "SELECT player_name, amount, bet_on, user_id FROM baby_fight_bets WHERE fight_id = ? ORDER BY created_at DESC"
+  ).all(fight.id) as Array<{ player_name: string; amount: number; bet_on: number; user_id: string }>;
 
   return {
     fight: formatFightForClient(fight),
-    bets: bets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on })),
+    bets: bets.map(b => ({ playerName: b.player_name, amount: b.amount, betOn: b.bet_on, isBot: isBotUserId(b.user_id) })),
     timeRemaining: getTimeRemaining(fight.scheduled_at),
   };
 }
