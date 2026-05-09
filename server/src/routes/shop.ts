@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { updatePeakNetWorth } from "./player.js";
+import { trackEvent } from "../engine/challengeEngine.js";
 import { rollBoxItem, LOOT_BOXES, RARITY_MAP, type BoxType } from "../data/items.js";
 import type {
   CatalogItem,
@@ -154,6 +155,7 @@ router.post("/open-box", authMiddleware, (req: AuthenticatedRequest, res) => {
     }
 
     updatePeakNetWorth(req.userId!);
+    trackEvent(db, req.userId!, "box_open");
 
     const updatedPlayer = db
       .prepare("SELECT * FROM players WHERE user_id = ?")

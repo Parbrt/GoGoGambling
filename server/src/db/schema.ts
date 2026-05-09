@@ -150,6 +150,9 @@ export function initSchema(): void {
   // Create loto v2 tables
   createLotoV2Tables(db);
 
+  // Create daily challenges tables
+  createChallengeTables(db);
+
   // Reset stale online status on server startup
   resetOnlineStatus(db);
 
@@ -502,4 +505,31 @@ function migrateChickenMatchColumn(db: ReturnType<typeof getDb>): void {
     db.prepare("ALTER TABLE players ADD COLUMN chicken_match TEXT").run();
     console.log("[schema] Added chicken_match column");
   }
+}
+
+function createChallengeTables(db: ReturnType<typeof getDb>): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS player_daily_challenges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      challenge_id INTEGER NOT NULL,
+      assigned_date TEXT NOT NULL,
+      progress INTEGER NOT NULL DEFAULT 0,
+      completed INTEGER NOT NULL DEFAULT 0,
+      completed_at TEXT,
+      UNIQUE(user_id, challenge_id, assigned_date),
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pdc_user_date ON player_daily_challenges(user_id, assigned_date);
+
+    CREATE TABLE IF NOT EXISTS player_challenge_streaks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL UNIQUE,
+      current_streak INTEGER NOT NULL DEFAULT 0,
+      last_completed_date TEXT,
+      weekly_box_ready INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES players(user_id)
+    );
+  `);
 }

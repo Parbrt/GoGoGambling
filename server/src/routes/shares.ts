@@ -3,6 +3,7 @@ import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { getCurrentPrices, insertTransactionSnapshot, getShareStats } from "../engine/shareEngine.js";
 import { updatePeakNetWorth } from "./player.js";
+import { trackEvent } from "../engine/challengeEngine.js";
 import type { Player, ShareSnapshot } from "../types.js";
 
 const router = Router();
@@ -105,6 +106,7 @@ router.post("/buy", authMiddleware, (req: AuthenticatedRequest, res) => {
   insertTransactionSnapshot(prices.priceA, prices.priceB);
 
   updatePeakNetWorth(req.userId!);
+  trackEvent(db, req.userId!, "trade");
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
@@ -161,6 +163,7 @@ router.post("/sell", authMiddleware, (req: AuthenticatedRequest, res) => {
   insertTransactionSnapshot(prices.priceA, prices.priceB);
 
   updatePeakNetWorth(req.userId!);
+  trackEvent(db, req.userId!, "trade");
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")

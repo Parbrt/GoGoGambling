@@ -3,6 +3,7 @@ import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { broadcastJackpotWin } from "../ws/index.js";
 import { updatePeakNetWorth } from "./player.js";
+import { trackEvent } from "../engine/challengeEngine.js";
 import type { Player } from "../types.js";
 
 const router = Router();
@@ -117,6 +118,10 @@ router.post("/slot/spin", authMiddleware, (req: AuthenticatedRequest, res) => {
 
   updatePeakNetWorth(req.userId!);
 
+  trackEvent(db, req.userId!, "slot_play");
+  if (result.reward > 0) trackEvent(db, req.userId!, "slot_win");
+  trackEvent(db, req.userId!, "big_bet", bet);
+
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
     .get(req.userId!) as Player;
@@ -185,6 +190,10 @@ router.post("/roulette/spin", authMiddleware, (req: AuthenticatedRequest, res) =
   db.prepare("UPDATE players SET nb_point = ? WHERE user_id = ?").run(newPoints, req.userId!);
 
   updatePeakNetWorth(req.userId!);
+
+  trackEvent(db, req.userId!, "roulette_play");
+  if (winnings > 0) trackEvent(db, req.userId!, "roulette_win");
+  trackEvent(db, req.userId!, "big_bet", bet);
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
@@ -397,6 +406,10 @@ router.post("/chicken/fight", authMiddleware, (req: AuthenticatedRequest, res) =
     .run(newPoints, newCharges, player.last_chicken_charge_refill, nextMatch, req.userId!);
 
   updatePeakNetWorth(req.userId!);
+
+  trackEvent(db, req.userId!, "chicken_bet");
+  if (isWin) trackEvent(db, req.userId!, "chicken_win");
+  trackEvent(db, req.userId!, "big_bet", bet);
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")

@@ -294,6 +294,39 @@ export const api = {
       get<{ draw: import("@/types").LotoDraw; tickets: import("@/types").LotoTicket[] }>(`/api/loto/draws/${date}`),
   },
 
+  challenges: {
+    today: () => get<{
+      date: string;
+      challenges: Array<{
+        id: number | null;
+        challengeId: number;
+        name: string;
+        description: string;
+        type: string;
+        target: number;
+        targetValue: number;
+        progress: number;
+        completed: boolean;
+        reward: number;
+        emoji: string;
+        difficulty: "easy" | "medium" | "hard";
+      }>;
+    }>("/api/challenges/today"),
+    streak: () => get<{
+      streak: number;
+      lastCompletedDate: string | null;
+      weeklyBoxReady: boolean;
+      allDoneToday: boolean;
+    }>("/api/challenges/streak"),
+    claimWeekly: () => post<{
+      success: boolean;
+      item: { name: string; emoji: string; rarity: string };
+      rolledRarity: string;
+      displayStyle: string;
+      player: PlayerType;
+    }>("/api/challenges/claim-weekly"),
+  },
+
   shop: {
     catalog: () => cachedGet<Array<{
       id: number;

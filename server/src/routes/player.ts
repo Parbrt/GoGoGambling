@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { getCurrentPrices } from "../engine/shareEngine.js";
+import { trackEvent } from "../engine/challengeEngine.js";
 import type { Player } from "../types.js";
 
 const router = Router();
@@ -56,7 +57,9 @@ router.get("/:id", (req, res) => {
 
   const row = db
     .prepare(
-      "SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B, is_online, last_seen, profile_photo, peak_net_worth FROM players WHERE id = ?"
+      `SELECT id, user_id, player_name, nb_point, nb_debt, nb_share_A, nb_share_B,
+        CASE WHEN is_online = 1 AND last_seen > datetime('now', '-60 seconds') THEN 1 ELSE 0 END AS is_online,
+        last_seen, profile_photo, peak_net_worth FROM players WHERE id = ?`
     )
     .get(numericId) as {
       id: number; user_id: string; player_name: string;
@@ -268,6 +271,7 @@ router.post("/daily-reward", authMiddleware, (req: AuthenticatedRequest, res) =>
     .run(newPoints, now.toISOString(), req.userId!);
 
   updatePeakNetWorth(req.userId!);
+  trackEvent(db, req.userId!, "daily_claim");
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")

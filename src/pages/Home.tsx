@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { formatCompactPoints } from "@/lib/utils";
 import { DailyReward } from "@/components/DailyReward";
+import { DailyChallenges } from "@/components/DailyChallenges";
 import { ShareChart } from "@/components/ShareChart";
 import { RankBadge } from "@/components/RankBadge";
 import type { PlayerType, ShareStats } from "@/types";
@@ -244,6 +245,16 @@ export function Home({ player, onPlayerUpdate }: HomeProps) {
             }
           }}
         />
+      </section>
+
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <span className="eyebrow">Objectifs</span>
+          <h2 className="text-3xl md:text-4xl font-medium tracking-[-0.03em] text-[#141413]">
+            Défis du jour.
+          </h2>
+        </div>
+        <DailyChallenges player={player} onPlayerUpdate={onPlayerUpdate} />
       </section>
     </div>
   );

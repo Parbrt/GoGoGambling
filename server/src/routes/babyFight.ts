@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getDb } from "../db/connection.js";
 import { authMiddleware, type AuthenticatedRequest } from "../auth/middleware.js";
 import { getCurrentFight, placeBet, getFightHistory, getFightById } from "../engine/babyFightEngine.js";
+import { trackEvent } from "../engine/challengeEngine.js";
 import type { Player } from "../types.js";
 
 const router = Router();
@@ -40,6 +41,8 @@ router.post("/bet", authMiddleware, (req: AuthenticatedRequest, res) => {
     res.status(400).json({ error: result.error });
     return;
   }
+
+  trackEvent(db, req.userId!, "baby_fight_bet");
 
   const updated = db
     .prepare("SELECT * FROM players WHERE user_id = ?")
