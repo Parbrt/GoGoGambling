@@ -102,6 +102,15 @@ export const ITEMS_CATALOG: CatalogItem[] = [
   { name: "Fabio",       category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
   { name: "Laurent",     category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
   { name: "Adeline",     category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Paul",        category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Guena",       category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Mathis",      category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Mathieu",     category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Jojo",        category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Emma",        category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Caca",        category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Prout",       category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
+  { name: "Basile",      category: "people", rarity: "unique", base_value: 0, qualifyable: false, emoji: "👤", description: "Une personne unique. Collection inestimable." },
 
   // ▸▸▸ FRUITS (Legendary) — CSV
   { name: "Apple",           category: "fruit", rarity: "legendary", base_value: 100000, qualifyable: true, emoji: "🍎", description: "Une pomme légendaire. La base de toute collection." },
