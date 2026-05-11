@@ -278,7 +278,6 @@ export function DailyChallenges({ player, onPlayerUpdate }: DailyChallengesProps
 
   // Build 7-day dots: last_completed_date tells us how far in the current streak we are
   // streak = N means N consecutive days done. Today counts if allDoneToday.
-  const todayStr = new Date().toISOString().slice(0, 10);
   const streakDays = Math.min(streak.streak, 7);
 
   if (loading) {
