@@ -28,17 +28,12 @@ export function useAutoNotifications({ currentUserId, currentPlayer }: UseAutoNo
         if (!player) return;
 
         const players = await api.leaderboard.list();
-        const sortedPlayers = players.sort((a, b) => {
-          const netA = a.nb_point - a.nb_debt;
-          const netB = b.nb_point - b.nb_debt;
-          return netB - netA;
-        });
 
-        const currentRank = sortedPlayers.findIndex(p => p.user_id === currentUserId) + 1;
+        const currentRank = players.findIndex(p => p.user_id === currentUserId) + 1;
         const previousRank = previousRankRef.current;
 
         if (previousRank > 0 && currentRank > previousRank) {
-          const overtakenBy = sortedPlayers[previousRank - 1];
+          const overtakenBy = players[previousRank - 1];
           if (overtakenBy && overtakenBy.is_online) {
             addNotification({
               type: "ranking",
@@ -50,7 +45,7 @@ export function useAutoNotifications({ currentUserId, currentPlayer }: UseAutoNo
         }
 
         if (previousRank > 0 && currentRank < previousRank) {
-          const overtook = sortedPlayers[currentRank];
+          const overtook = players[currentRank];
           if (overtook && overtook.is_online) {
             addNotification({
               type: "success",
@@ -62,7 +57,7 @@ export function useAutoNotifications({ currentUserId, currentPlayer }: UseAutoNo
         }
 
         previousRankRef.current = currentRank;
-        previousPlayersRef.current = sortedPlayers;
+        previousPlayersRef.current = players;
       } catch (error) {
         console.error("Error checking rankings:", error);
       }

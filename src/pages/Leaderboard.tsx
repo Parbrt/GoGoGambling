@@ -10,6 +10,7 @@ import { PlayerCard } from "@/components/PlayerCard";
 import type { PlayerType } from "@/types";
 
 interface LeaderboardPlayer extends PlayerType {
+  total_capital: number;
   equipped_title_name: string | null;
   equipped_title_rarity: string | null;
   equipped_title_emoji: string | null;
@@ -282,7 +283,7 @@ export function Leaderboard() {
                     <div className="flex items-center gap-3">
                       {p.nb_share_A > 0 && <span className="inline-flex text-xs font-medium text-[#3860BE] bg-white border border-[#3860BE]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_A} GCC</span>}
                       {p.nb_share_B > 0 && <span className="inline-flex text-xs font-medium text-[#9A3A0A] bg-white border border-[#9A3A0A]/30 rounded-[999px] px-3 py-1 tracking-[-0.02em]">{p.nb_share_B} GC</span>}
-                      <span className="text-xl font-medium text-[#141413] tracking-[-0.03em] tabular-nums">{formatCompactPoints(p.nb_point)}</span>
+                      <span className="text-xl font-medium text-[#141413] tracking-[-0.03em] tabular-nums">{formatCompactPoints(p.total_capital)}</span>
                       <span className="text-xs uppercase tracking-[0.08em] text-[#696969] hidden sm:inline">pts</span>
                     </div>
                   </motion.div>
@@ -507,7 +508,7 @@ function PodiumCard({
             </div>
           )}
           <p className="text-3xl font-medium tracking-[-0.03em] text-[#9A3A0A] tabular-nums">
-            {formatCompactPoints(player.nb_point)}
+            {formatCompactPoints(player.total_capital)}
             <span className="text-sm text-[#696969] tracking-[0.08em] uppercase ml-2 align-middle">pts</span>
           </p>
         </div>
