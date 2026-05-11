@@ -6,11 +6,22 @@ import type { PriceUpdate } from "../types.js";
 
 let supabase: SupabaseClient | null = null;
 
+const silentFetch: typeof fetch = async (input, init) => {
+  try {
+    return await fetch(input, init);
+  } catch {
+    return new Response(JSON.stringify({ error: "Network unavailable", message: "Network unavailable" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+};
+
 function getSupabase(): SupabaseClient {
   if (!supabase) {
     const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
-    supabase = createClient(url, key);
+    supabase = createClient(url, key, { global: { fetch: silentFetch } });
   }
   return supabase;
 }
